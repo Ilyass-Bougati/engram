@@ -24,13 +24,21 @@ Requirements: Node 22 and npm.
 ```bash
 cd frontend
 npm ci
-npm run dev        # http://localhost:6969, proxies /api to 127.0.0.1:6767
+npm run dev        # http://localhost:6969, proxies /api to ENGRAM_API_URL
 npm run lint
 npm run format:check
 npm run typecheck
 npm test           # Vitest: Markdown/XSS and contrast tests
 npm run build
 ```
+
+By default the dev server uses the Compose backend on `127.0.0.1:6767`. To use the k3s deployment on this machine instead, with no port-forward, put this in `frontend/.env.local`:
+
+```
+ENGRAM_API_URL=http://10.43.67.67:8000
+```
+
+That is the backend Service's fixed address. A k3s node can reach Service addresses directly.
 
 ## End-to-end tests
 

@@ -24,7 +24,7 @@ The migration Job, the `wait-for-migrations` initContainer and the admin CLI loa
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `ENGRAM_API_URL` | `http://127.0.0.1:6767` | Where the Vite dev server proxies `/api`. The E2E run points it at its own backend. |
+| `ENGRAM_API_URL` | `http://127.0.0.1:6767` (the Compose backend) | Where the Vite dev server proxies `/api`. Put it in `frontend/.env.local` (gitignored) to keep it. Use `ENGRAM_API_URL=http://10.43.67.67:8000` for the k3s backend on the same machine. A value set in the environment wins, which is how the E2E run points at its own backend. |
 
 ## Proxies and client IPs
 

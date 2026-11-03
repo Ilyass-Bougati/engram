@@ -4,6 +4,11 @@ metadata:
   name: backend
 spec:
   type: ClusterIP
+  # A fixed address in k3s's default service range (10.43.0.0/16), so things on the node
+  # itself, which can't resolve cluster DNS, always find the API at 10.43.67.67:8000: the
+  # Vite dev server, or cloudflared run as a host service. A Service's address can't be
+  # changed in place, so an existing Service has to be deleted once to pick this up.
+  clusterIP: 10.43.67.67
   selector:
     app.kubernetes.io/name: backend
   ports:

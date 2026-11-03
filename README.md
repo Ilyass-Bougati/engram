@@ -41,7 +41,7 @@ The manifests in [`deploy/k8s/`](deploy/k8s) are plain kustomize. They contain n
 | `engram` | Namespace | Pod Security `restricted` enforced |
 | `postgres` | StatefulSet + headless Service | 5 Gi PVC on `local-path` |
 | `engram-migrate` | Job | `alembic upgrade head`, removed 10 minutes after it finishes |
-| `backend` | Deployment + ClusterIP Service on port 8000 | 1 replica. An initContainer waits until the schema matches the image. |
+| `backend` | Deployment + ClusterIP Service at the fixed address `10.43.67.67:8000` | 1 replica. An initContainer waits until the schema matches the image. |
 | `default-deny-ingress`, `postgres`, `backend` | NetworkPolicy | Postgres accepts the backend and the Job only. The API accepts pods in the namespace only. |
 
 Every pod runs as non-root with a read-only root filesystem, no capabilities, the runtime's seccomp profile and no service account token.
@@ -131,19 +131,19 @@ The admin then invites everyone else from the app.
 
 ### 6. Check the API
 
-```bash
-kubectl -n engram port-forward svc/backend 6767:8000
-```
-
-Then, in another terminal:
+On the k3s node itself:
 
 ```bash
-curl -fsS http://127.0.0.1:6767/api/health/ready
+curl -fsS http://10.43.67.67:8000/api/health/ready
 ```
+
+From another machine, use `kubectl -n engram port-forward svc/backend 6767:8000` and `curl` `127.0.0.1:6767` instead.
+
+The Service's address is fixed in `backend.yaml` and sits in k3s's default service range. If your cluster uses a different `--service-cidr`, change it or remove the line. A Service's address can't change in place: if `apply` reports `may not change once set`, run `kubectl -n engram delete svc backend` once, then apply again.
 
 ### 7. Point the tunnel at it
 
-The API's in-cluster address is `http://backend.engram.svc.cluster.local:8000`. Once something serves the web app, give the tunnel one public hostname that sends `/api/` to the backend and everything else to the web server. cloudflared's ingress rules can split by path:
+Inside the cluster the API is `http://backend.engram.svc.cluster.local:8000`. On the node itself it is `http://10.43.67.67:8000`, which is the address to use if cloudflared runs as a host service rather than a pod. Once something serves the web app, give the tunnel one public hostname that sends `/api/` to the backend and everything else to the web server. cloudflared's ingress rules can split by path:
 
 ```yaml
 ingress:
