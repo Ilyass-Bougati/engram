@@ -119,6 +119,11 @@ def list_cards(
     cursor: Annotated[str | None, Query(max_length=100)] = None,
     limit: Annotated[int, Query(ge=1, le=200)] = 50,
 ) -> CardPage:
+    """Cards in the deck, oldest first.
+
+    `q` matches any text on the card and `tag` one tag. Pass `next_cursor` back as `cursor`
+    for the next page. Quiz options carry `is_correct` only for editors and the owner.
+    """
     query = select(Card).where(Card.deck_id == access.deck.id)
     if q and q.strip():
         query = query.where(
@@ -153,6 +158,7 @@ def _parse_cursor(cursor: str) -> tuple[datetime, uuid.UUID]:
 
 @router.post("/cards", status_code=status.HTTP_201_CREATED)
 def create_card(body: CardData, access: EditorAccess, session: SessionDep) -> CardView:
+    """Add a card."""
     [card] = add_cards(session, access.deck.id, [body])
     session.commit()
     return _card_views(session, access, [card])[0]
@@ -160,6 +166,7 @@ def create_card(body: CardData, access: EditorAccess, session: SessionDep) -> Ca
 
 @router.get("/cards/{card_id}")
 def get_card(card_id: uuid.UUID, access: ViewerAccess, session: SessionDep) -> CardView:
+    """A card. Quiz options carry `is_correct` only for editors and the owner."""
     return _card_views(session, access, [_card_in_deck(session, access, card_id)])[0]
 
 
@@ -167,6 +174,10 @@ def get_card(card_id: uuid.UUID, access: ViewerAccess, session: SessionDep) -> C
 def update_card(
     card_id: uuid.UUID, body: CardData, access: EditorAccess, session: SessionDep
 ) -> CardView:
+    """Replace a card's content.
+
+    The body is the whole card; options and tags are replaced. Review progress is kept.
+    """
     card = _card_in_deck(session, access, card_id)
     replace_card_content(session, card, body)
     session.commit()
@@ -175,6 +186,7 @@ def update_card(
 
 @router.delete("/cards/{card_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_card(card_id: uuid.UUID, access: EditorAccess, session: SessionDep) -> None:
+    """Delete a card and every member's progress on it."""
     session.delete(_card_in_deck(session, access, card_id))
     session.commit()
 
@@ -186,6 +198,7 @@ class TagCount(BaseModel):
 
 @router.get("/tags")
 def list_tags(access: ViewerAccess, session: SessionDep) -> list[TagCount]:
+    """Tags used in the deck, with card counts."""
     rows = session.exec(
         select(CardTag.tag, func.count())
         .join(Card)

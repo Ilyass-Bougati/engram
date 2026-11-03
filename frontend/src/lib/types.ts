@@ -1,5 +1,5 @@
-// Response and request shapes of the backend API (backend/app/routers). Kept by hand: the API
-// is small and the backend serves no OpenAPI document to generate from.
+// Response and request shapes of the backend API. Kept by hand, since the API is small; the
+// reference to match is docs/openapi.json.
 
 export type GlobalRole = "admin" | "user";
 export type DeckRole = "owner" | "editor" | "viewer";

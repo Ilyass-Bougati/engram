@@ -103,11 +103,13 @@ api = APIRouter(prefix="/api")
 
 @api.get("/health", openapi_extra=PUBLIC, tags=["health"])
 def health() -> dict[str, str]:
+    """Liveness check. Doesn't touch the database."""
     return {"status": "ok"}
 
 
 @api.get("/health/ready", openapi_extra=PUBLIC, tags=["health"])
 def ready(session: SessionDep) -> dict[str, str]:
+    """Readiness check: the database answers a query."""
     session.connection().execute(text("SELECT 1"))
     return {"status": "ok"}
 

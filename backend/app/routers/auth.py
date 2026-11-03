@@ -90,6 +90,11 @@ class LoginRequest(StrictModel):
     dependencies=[Depends(limit_by_ip(login_ip_limiter))],
 )
 def login(body: LoginRequest, session: SessionDep, response: Response) -> SessionResponse:
+    """Sign in.
+
+    Returns an access token and sets the refresh cookie. An unknown username, a wrong
+    password and a deactivated account all get the same 401.
+    """
     username_key = body.username.casefold()
     login_failure_limiter.check(username_key)
     user = session.exec(select(User).where(User.username == body.username)).first()
@@ -113,6 +118,11 @@ def refresh(
     response: Response,
     refresh_cookie: Annotated[str | None, Cookie(alias=REFRESH_COOKIE)] = None,
 ) -> SessionResponse | JSONResponse:
+    """Get a new access token from the refresh cookie.
+
+    The cookie is rotated: each refresh token works once. Presenting one that was already used
+    signs out every session that came from the same sign-in.
+    """
     if refresh_cookie is None:
         return _signed_out("You are signed out.")
     # Row lock: two concurrent refreshes with the same token must not both succeed.
@@ -147,6 +157,10 @@ def logout(
     response: Response,
     refresh_cookie: Annotated[str | None, Cookie(alias=REFRESH_COOKIE)] = None,
 ) -> None:
+    """Sign out.
+
+    Revokes this sign-in's refresh tokens and clears the cookie. Succeeds without a cookie too.
+    """
     if refresh_cookie is not None:
         presented = session.exec(
             select(RefreshToken).where(RefreshToken.token_hash == hash_opaque_token(refresh_cookie))

@@ -34,6 +34,7 @@ def _member(session: Session, access: DeckAccess, user_id: uuid.UUID) -> tuple[D
 
 @router.get("")
 def list_members(access: ViewerAccess, session: SessionDep) -> list[MemberView]:
+    """Everyone with access to the deck."""
     rows = session.exec(
         select(DeckMember, User)
         .join(User)
@@ -53,6 +54,7 @@ class ShareRequest(StrictModel):
 
 @router.post("", status_code=status.HTTP_201_CREATED)
 def share_deck(body: ShareRequest, access: OwnerAccess, session: SessionDep) -> MemberView:
+    """Give an existing user editor or viewer access."""
     user = session.exec(
         select(User).where(User.username == body.username, col(User.is_active).is_(True))
     ).first()
@@ -78,6 +80,7 @@ class RoleChange(StrictModel):
 def change_member_role(
     user_id: uuid.UUID, body: RoleChange, access: OwnerAccess, session: SessionDep
 ) -> MemberView:
+    """Switch a member between editor and viewer."""
     member, user = _member(session, access, user_id)
     if member.role == DeckRole.owner:
         raise HTTPException(status.HTTP_409_CONFLICT, "The owner's role can't be changed.")
@@ -89,6 +92,10 @@ def change_member_role(
 
 @router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
 def remove_member(user_id: uuid.UUID, access: ViewerAccess, session: SessionDep) -> None:
+    """Remove a member, or leave the deck.
+
+    The owner can remove anyone else; any other member can remove only themself.
+    """
     # The owner removes anyone else; everyone else can only remove themselves (leave).
     is_owner = access.member.role == DeckRole.owner
     if not is_owner and user_id != access.user.id:

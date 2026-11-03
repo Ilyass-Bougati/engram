@@ -43,6 +43,7 @@ class InviteStatus(BaseModel):
 
 @router.get("/{token}", openapi_extra=PUBLIC)
 def get_invite(token: str, session: SessionDep) -> InviteStatus:
+    """Check an invite link before showing the sign-up form."""
     return InviteStatus(expires_at=_usable_invite(session, token, lock=False).expires_at)
 
 
@@ -56,6 +57,10 @@ class RedeemRequest(StrictModel):
 def redeem_invite(
     token: str, body: RedeemRequest, session: SessionDep, response: Response
 ) -> SessionResponse:
+    """Create an account from an invite and sign in.
+
+    The invite is used up. The response and cookie are the same as for login.
+    """
     # The row lock makes the invite single-use even under concurrent redemptions.
     invite = _usable_invite(session, token, lock=True)
     if session.exec(select(User).where(User.username == body.username)).first():

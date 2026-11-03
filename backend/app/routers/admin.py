@@ -66,6 +66,7 @@ def _summarize(invite: Invite, created_by: str, used_by: str | None) -> InviteSu
 
 @router.get("/invites")
 def list_invites(session: SessionDep) -> list[InviteSummary]:
+    """Every invite and its state."""
     creator = aliased(User)
     redeemer = aliased(User)
     rows = session.exec(
@@ -79,6 +80,11 @@ def list_invites(session: SessionDep) -> list[InviteSummary]:
 
 @router.post("/invites", status_code=status.HTTP_201_CREATED)
 def create_invite(admin: AdminUser, session: SessionDep) -> CreatedInvite:
+    """Create an invite, valid for 7 days.
+
+    The token is in this response only; the server stores its hash. The sign-up link is
+    /invite/{token} on the app.
+    """
     token, token_hash = new_opaque_token()
     invite = Invite(token_hash=token_hash, created_by_id=admin.id, expires_at=utcnow() + INVITE_TTL)
     session.add(invite)
@@ -89,6 +95,7 @@ def create_invite(admin: AdminUser, session: SessionDep) -> CreatedInvite:
 
 @router.delete("/invites/{invite_id}", status_code=status.HTTP_204_NO_CONTENT)
 def revoke_invite(invite_id: uuid.UUID, session: SessionDep) -> None:
+    """Revoke an invite. Revoking twice is fine; a used invite can't be revoked."""
     invite = session.get(Invite, invite_id)
     if invite is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Invite not found.")
@@ -110,6 +117,7 @@ class AdminUserView(BaseModel):
 
 @router.get("/users")
 def list_users(session: SessionDep) -> list[AdminUserView]:
+    """Every account."""
     users = session.exec(select(User).order_by(col(User.username))).all()
     return [AdminUserView.model_validate(user, from_attributes=True) for user in users]
 
@@ -123,6 +131,11 @@ class UserUpdate(StrictModel):
 def update_user(
     user_id: uuid.UUID, body: UserUpdate, admin: AdminUser, session: SessionDep
 ) -> AdminUserView:
+    """Activate, deactivate, promote or demote an account.
+
+    Deactivating signs the user out everywhere at once. Admins can't deactivate or demote
+    themselves, so an active admin always remains.
+    """
     user = session.get(User, user_id)
     if user is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "User not found.")

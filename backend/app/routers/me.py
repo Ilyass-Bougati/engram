@@ -13,6 +13,7 @@ router = APIRouter(prefix="/me", tags=["me"])
 
 @router.get("")
 def get_me(user: CurrentUser) -> UserPublic:
+    """Your account."""
     return UserPublic.model_validate(user)
 
 
@@ -22,6 +23,7 @@ class ProfileUpdate(StrictModel):
 
 @router.patch("")
 def update_me(body: ProfileUpdate, user: CurrentUser, session: SessionDep) -> UserPublic:
+    """Change your timezone, which sets when your study day starts (04:00 local time)."""
     user.timezone = body.timezone
     session.add(user)
     session.commit()
@@ -38,6 +40,11 @@ class PasswordChange(StrictModel):
 def change_password(
     body: PasswordChange, user: CurrentUser, session: SessionDep, response: Response
 ) -> SessionResponse:
+    """Change your password.
+
+    Ends every other session. This one continues with the new access token and cookie in the
+    response.
+    """
     if not verify_password(user.password_hash, body.current_password):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Your current password is incorrect.")
     user.password_hash = hash_password(body.new_password)
@@ -50,4 +57,5 @@ def change_password(
 
 @router.get("/stats")
 def get_my_stats(user: CurrentUser, session: SessionDep) -> Stats:
+    """Your study statistics across all decks. See docs/stats.md."""
     return user_stats(session, user, utcnow())

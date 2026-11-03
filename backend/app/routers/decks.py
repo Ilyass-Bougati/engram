@@ -82,6 +82,7 @@ def _create_owned_deck(session: Session, user: User, meta: DeckMeta) -> tuple[De
 
 @router.get("")
 def list_decks(user: CurrentUser, session: SessionDep) -> list[DeckView]:
+    """Your decks, with your role and today's due and new counts."""
     rows = session.exec(
         select(Deck, DeckMember)
         .join(DeckMember)
@@ -93,6 +94,7 @@ def list_decks(user: CurrentUser, session: SessionDep) -> list[DeckView]:
 
 @router.post("", status_code=status.HTTP_201_CREATED)
 def create_deck(body: DeckMeta, user: CurrentUser, session: SessionDep) -> DeckView:
+    """Create a deck. You become its owner."""
     deck, member = _create_owned_deck(session, user, body)
     session.commit()
     return _deck_views(session, user, [(deck, member)])[0]
@@ -100,6 +102,7 @@ def create_deck(body: DeckMeta, user: CurrentUser, session: SessionDep) -> DeckV
 
 @router.post("/import", status_code=status.HTTP_201_CREATED)
 def import_new_deck(body: DeckFile, user: CurrentUser, session: SessionDep) -> DeckView:
+    """Create a deck from a deck file (docs/deck-format.md)."""
     deck, member = _create_owned_deck(session, user, body.deck)
     add_cards(session, deck.id, body.cards)
     session.commit()
@@ -187,7 +190,23 @@ def _store_anki_deck(
     )
 
 
-@router.post("/import/anki", status_code=status.HTTP_201_CREATED)
+# FastAPI can't see a body read from request.stream(), so the spec describes it here.
+ANKI_UPLOAD_BODY = {"schema": {"type": "string", "format": "binary"}}
+
+
+@router.post(
+    "/import/anki",
+    status_code=status.HTTP_201_CREATED,
+    openapi_extra={
+        "requestBody": {
+            "required": True,
+            "content": {
+                "application/gzip": ANKI_UPLOAD_BODY,
+                "application/octet-stream": ANKI_UPLOAD_BODY,
+            },
+        }
+    },
+)
 async def import_anki_deck(
     request: Request,
     user: CurrentUser,
@@ -195,6 +214,11 @@ async def import_anki_deck(
     keep_progress: bool = False,
     name: Annotated[str, Query(max_length=200)] = "",
 ) -> AnkiImportResult:
+    """Create a deck from an Anki collection.
+
+    The body is the collection database from inside an .apkg, gzipped or not; the web app
+    extracts it in the browser, and media isn't uploaded. See docs/anki-import.md.
+    """
     # The body is the collection from an .apkg (the browser extracts it), not JSON. It's
     # streamed to disk rather than held in memory.
     with tempfile.TemporaryDirectory(prefix="engram-anki-") as directory:
@@ -221,6 +245,7 @@ async def import_anki_deck(
 
 @router.get("/{deck_id}")
 def get_deck(access: ViewerAccess, session: SessionDep) -> DeckView:
+    """A deck, with your role and today's counts."""
     return _deck_views(session, access.user, [(access.deck, access.member)])[0]
 
 
@@ -233,6 +258,7 @@ class DeckUpdate(StrictModel):
 
 @router.patch("/{deck_id}")
 def update_deck(body: DeckUpdate, access: OwnerAccess, session: SessionDep) -> DeckView:
+    """Rename a deck or change its description."""
     deck = access.deck
     if body.name is not None:
         deck.name = body.name
@@ -246,6 +272,7 @@ def update_deck(body: DeckUpdate, access: OwnerAccess, session: SessionDep) -> D
 
 @router.delete("/{deck_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_deck(access: OwnerAccess, session: SessionDep) -> None:
+    """Delete a deck, its cards and every member's progress on it."""
     # Members, cards and their review history go with it through ON DELETE CASCADE.
     session.delete(access.deck)
     session.commit()
@@ -259,6 +286,7 @@ class MyDeckSettings(StrictModel):
 def update_my_deck_settings(
     body: MyDeckSettings, access: ViewerAccess, session: SessionDep
 ) -> DeckView:
+    """Your settings for this deck. Each member has their own new-card limit."""
     access.member.new_cards_per_day = body.new_cards_per_day
     session.add(access.member)
     session.commit()
@@ -282,6 +310,11 @@ def _deck_file(session: Session, access: DeckAccess) -> DeckFile:
 
 @router.post("/{deck_id}/fork", status_code=status.HTTP_201_CREATED)
 def fork_deck(access: ViewerAccess, session: SessionDep) -> DeckView:
+    """Copy a deck into a new one you own.
+
+    Cards, quiz options and tags are copied; members and progress aren't. Any member can fork,
+    so the copy's answer key is visible to its new owner.
+    """
     # A fork is a plain copy with fresh IDs and no link back; progress isn't copied because
     # review state is keyed by card ID.
     source = _deck_file(session, access)
@@ -294,6 +327,7 @@ def fork_deck(access: ViewerAccess, session: SessionDep) -> DeckView:
 
 @router.get("/{deck_id}/export")
 def export_deck(access: ViewerAccess, session: SessionDep, response: Response) -> DeckFile:
+    """Download the deck as a deck file, answer key included. Any member can export."""
     slug = re.sub(r"[^a-z0-9]+", "-", access.deck.name.lower()).strip("-") or "deck"
     response.headers["Content-Disposition"] = f'attachment; filename="{slug}.engram.json"'
     return _deck_file(session, access)
@@ -306,6 +340,7 @@ class ImportResult(BaseModel):
 
 @router.post("/{deck_id}/import")
 def import_into_deck(body: DeckFile, access: EditorAccess, session: SessionDep) -> ImportResult:
+    """Add the cards from a deck file. Its deck name and description are ignored."""
     add_cards(session, access.deck.id, body.cards)
     session.commit()
     [deck_view] = _deck_views(session, access.user, [(access.deck, access.member)])

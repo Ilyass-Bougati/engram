@@ -86,6 +86,11 @@ def _study_next(session: Session, access: DeckAccess) -> StudyNext:
 
 @router.get("/study/next")
 def get_next_card(access: ViewerAccess, session: SessionDep) -> StudyNext:
+    """The next card to study, and what's left today.
+
+    Due cards come first, then new cards up to your daily limit. `card` is null when you're done
+    for now. Quiz options are shuffled and carry no answer key.
+    """
     return _study_next(session, access)
 
 
@@ -124,6 +129,11 @@ class Rating(StrictModel):
 
 @router.post("/reviews")
 def rate_card(body: Rating, access: ViewerAccess, session: SessionDep) -> StudyNext:
+    """Rate the card you just studied, and get the next one.
+
+    The server schedules the next review. A quiz card can be rated only after a correct answer,
+    and then only Hard, Good or Easy.
+    """
     card, state = _review_target(session, access, body.card_id)
     now = utcnow()
     if card.kind == CardKind.quiz:
@@ -155,6 +165,11 @@ class QuizResult(BaseModel):
 
 @router.post("/reviews/quiz-answer")
 def answer_quiz(body: QuizAnswer, access: ViewerAccess, session: SessionDep) -> QuizResult:
+    """Answer a quiz card.
+
+    A wrong answer counts as Again and `next` holds the next card. After a correct one, rate the
+    card within an hour.
+    """
     card, state = _review_target(session, access, body.card_id)
     if card.kind != CardKind.quiz:
         raise HTTPException(status.HTTP_409_CONFLICT, "This card isn't a quiz card.")
