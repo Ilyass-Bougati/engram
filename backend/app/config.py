@@ -4,7 +4,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     # Environment only: no .env file is read, so a missing secret fails loudly at startup.
-    model_config = SettingsConfigDict(env_file=None, extra="ignore")
+    # Hiding inputs keeps a rejected secret (or a DATABASE_URL with its password) out of logs.
+    model_config = SettingsConfigDict(env_file=None, extra="ignore", hide_input_in_errors=True)
 
     database_url: str
     jwt_secret: SecretStr = Field(min_length=32)

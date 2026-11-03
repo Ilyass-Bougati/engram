@@ -30,7 +30,7 @@ def _run(args: list[str], env: dict[str, str], stdin: str = "") -> subprocess.Co
     [
         ("JWT_SECRET", {}, "jwt_secret"),
         ("DATABASE_URL", {}, "database_url"),
-        (None, {"JWT_SECRET": "too-short"}, "jwt_secret"),
+        (None, {"JWT_SECRET": "too-short-secret"}, "jwt_secret"),
     ],
 )
 def test_backend_refuses_to_start_without_valid_secrets(
@@ -40,6 +40,9 @@ def test_backend_refuses_to_start_without_valid_secrets(
     result = _run(["-c", "import app.main"], env)
     assert result.returncode != 0
     assert expected_field in result.stderr
+    for secret in (env.get("JWT_SECRET"), env.get("DATABASE_URL")):
+        if secret:
+            assert secret not in result.stderr
 
 
 def test_create_admin_cli_creates_a_working_admin() -> None:

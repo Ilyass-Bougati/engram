@@ -34,7 +34,8 @@ services:
     depends_on:
       migrate:
         condition: service_completed_successfully
-    # Published only until the nginx frontend (Phase 4) takes over as the single origin.
+    # Direct API access on the host. The app itself is served by the frontend on 6969,
+    # which proxies /api here, so browsers only ever see one origin.
     ports:
       - "127.0.0.1:6767:8000"
     healthcheck:

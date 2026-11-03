@@ -1,6 +1,7 @@
 import os
 import secrets
 from collections.abc import Callable, Iterator
+from dataclasses import dataclass
 from pathlib import Path
 
 import pytest
@@ -20,7 +21,16 @@ from sqlmodel import Session, SQLModel  # noqa: E402
 from app.db import engine  # noqa: E402
 from app.models import GlobalRole, User  # noqa: E402
 from app.rate_limit import ALL_LIMITERS  # noqa: E402
-from tests.helpers import create_user, new_client, sign_in  # noqa: E402
+from tests.helpers import (  # noqa: E402
+    BASIC_CARD,
+    QUIZ_CARD,
+    create_card,
+    create_deck,
+    create_user,
+    new_client,
+    share,
+    sign_in,
+)
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent
 
@@ -60,3 +70,42 @@ def signed_in() -> SignedIn:
         return client, user
 
     return make
+
+
+@dataclass
+class Team:
+    owner: TestClient
+    editor: TestClient
+    viewer: TestClient
+    outsider: TestClient
+    owner_user: User
+    editor_user: User
+    viewer_user: User
+    outsider_user: User
+    deck_id: str
+    card_id: str
+    quiz_card_id: str
+
+
+@pytest.fixture
+def team(signed_in: SignedIn) -> Team:
+    owner, owner_user = signed_in("alice")
+    editor, editor_user = signed_in("erin")
+    viewer, viewer_user = signed_in("vic")
+    outsider, outsider_user = signed_in("bob")
+    deck_id = create_deck(owner)
+    share(owner, deck_id, "erin", "editor")
+    share(owner, deck_id, "vic", "viewer")
+    return Team(
+        owner=owner,
+        editor=editor,
+        viewer=viewer,
+        outsider=outsider,
+        owner_user=owner_user,
+        editor_user=editor_user,
+        viewer_user=viewer_user,
+        outsider_user=outsider_user,
+        deck_id=deck_id,
+        card_id=create_card(owner, deck_id, BASIC_CARD),
+        quiz_card_id=create_card(owner, deck_id, QUIZ_CARD),
+    )

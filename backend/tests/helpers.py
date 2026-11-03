@@ -1,3 +1,6 @@
+from collections.abc import Mapping
+from typing import Any
+
 from fastapi.testclient import TestClient
 from sqlmodel import Session
 
@@ -40,3 +43,39 @@ def client_with_refresh_cookie(cookie: str) -> TestClient:
     # http.cookiejar files dotless hosts under "<host>.local".
     client.cookies.set(REFRESH_COOKIE, cookie, domain="testserver.local")
     return client
+
+
+BASIC_CARD = {"type": "basic", "front": "Capital of Morocco?", "back": "Rabat", "tags": ["geo"]}
+QUIZ_CARD = {
+    "type": "quiz",
+    "question": "Which are prime?",
+    "select_all": True,
+    "options": [
+        {"text": "2", "correct": True},
+        {"text": "4", "correct": False},
+        {"text": "7", "correct": True},
+    ],
+    "explanation": "4 = 2 x 2.",
+    "tags": ["math"],
+}
+
+
+def create_deck(client: TestClient, name: str = "Geography") -> str:
+    response = client.post("/api/decks", json={"name": name})
+    assert response.status_code == 201, response.text
+    deck_id: str = response.json()["id"]
+    return deck_id
+
+
+def create_card(client: TestClient, deck_id: str, card: Mapping[str, Any]) -> str:
+    response = client.post(f"/api/decks/{deck_id}/cards", json=card)
+    assert response.status_code == 201, response.text
+    card_id: str = response.json()["id"]
+    return card_id
+
+
+def share(owner: TestClient, deck_id: str, username: str, role: str) -> None:
+    response = owner.post(
+        f"/api/decks/{deck_id}/members", json={"username": username, "role": role}
+    )
+    assert response.status_code == 201, response.text

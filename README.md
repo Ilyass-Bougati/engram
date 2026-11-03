@@ -2,7 +2,7 @@
 
 A self-hosted spaced-repetition flashcard app for a small group of people. Accounts are invite-only.
 
-Status: Phase 1 of 6 (backend foundation: accounts, invites, sessions, admin CLI). See `PLAN.md`.
+Status: Phase 2 of 6. Done so far: accounts, invites, sessions, the admin CLI, decks, cards, sharing, roles, forking, and JSON import/export. See `PLAN.md`.
 
 ## Run it with Docker Compose
 
@@ -23,7 +23,7 @@ Compose starts three services:
 | `migrate` | Runs `alembic upgrade head` once, then exits. |
 | `backend` | The API. It starts only after `migrate` succeeds. |
 
-Until the frontend lands (Phase 4), the API is published at `http://127.0.0.1:6767/api`.
+The API is published at `http://127.0.0.1:6767/api`. From Phase 4 on, the app is served at `http://localhost:6969`, with nginx proxying `/api` to the backend.
 
 ## Environment variables
 
@@ -49,6 +49,15 @@ Run inside the backend container (`docker compose exec backend …`), or from `b
 `create-admin` and `set-password` accept `--password-stdin`, which reads the password from the first line of stdin.
 
 Admins invite people from the app. An invite link is single-use and expires after 7 days.
+
+## Decks and sharing
+
+Each deck has one owner, who can share it by username as `editor` (may edit cards) or `viewer` (study only). The owner can change or revoke a member's role, and any member can leave a deck.
+
+- **Hidden decks:** someone who isn't a member gets `404` for a deck and everything in it, so they can't tell it exists.
+- **Hidden answer keys:** viewers browsing a deck don't see which quiz options are correct, or the explanation. Exports and forks do include the answer key, and any member can export or fork.
+- **Forks:** a fork is an independent copy owned by whoever forked it. It has no link back to the original, and no review progress carries over.
+- **Import/export:** the JSON deck format is documented in [`docs/deck-format.md`](docs/deck-format.md), with an example in [`docs/example-deck.json`](docs/example-deck.json). Imports are capped at 2 MiB and 5,000 cards.
 
 ## How sessions work
 

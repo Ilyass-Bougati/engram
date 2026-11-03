@@ -1,0 +1,47 @@
+{
+  "format": "engram-deck",
+  "version": 1,
+  "deck": {
+    "name": "Linear algebra basics",
+    "description": "Definitions and a few quick checks."
+  },
+  "cards": [
+    {
+      "type": "basic",
+      "front": "What is the determinant of $\\begin{pmatrix} a & b \\\\ c & d \\end{pmatrix}$?",
+      "back": "$$ad - bc$$",
+      "tags": ["determinant", "2x2"]
+    },
+    {
+      "type": "basic",
+      "front": "Compute a dot product in NumPy.",
+      "back": "```python\nimport numpy as np\n\nnp.dot([1, 2, 3], [4, 5, 6])  # 32\n```",
+      "tags": ["numpy"]
+    },
+    {
+      "type": "quiz",
+      "question": "Which matrix is the identity $I_2$?",
+      "select_all": false,
+      "options": [
+        { "text": "$\\begin{pmatrix} 1 & 0 \\\\ 0 & 1 \\end{pmatrix}$", "correct": true },
+        { "text": "$\\begin{pmatrix} 0 & 1 \\\\ 1 & 0 \\end{pmatrix}$", "correct": false },
+        { "text": "$\\begin{pmatrix} 1 & 1 \\\\ 1 & 1 \\end{pmatrix}$", "correct": false }
+      ],
+      "explanation": "$I_2$ has ones on the diagonal and zeros elsewhere, so $I_2 A = A$.",
+      "tags": ["identity"]
+    },
+    {
+      "type": "quiz",
+      "question": "Which of these are always true for square matrices $A$ and $B$?",
+      "select_all": true,
+      "options": [
+        { "text": "$\\det(AB) = \\det(A)\\det(B)$", "correct": true },
+        { "text": "$AB = BA$", "correct": false },
+        { "text": "$(AB)^T = B^T A^T$", "correct": true },
+        { "text": "$\\det(A + B) = \\det(A) + \\det(B)$", "correct": false }
+      ],
+      "explanation": "Matrix multiplication isn't commutative, and the determinant isn't additive.",
+      "tags": ["determinant", "transpose"]
+    }
+  ]
+}

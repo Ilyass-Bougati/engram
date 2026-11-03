@@ -4,7 +4,7 @@ from fastapi import APIRouter, FastAPI
 from fastapi.dependencies.models import Dependant
 from fastapi.routing import APIRoute, RouteContext, iter_route_contexts
 
-from app.deps import PUBLIC, get_current_user
+from app.deps import DECK_ROLE_DEPENDENCIES, PUBLIC, get_current_user
 from app.main import app
 
 EXPECTED_PUBLIC_ROUTES = {
@@ -47,6 +47,29 @@ def unprotected_routes(application: FastAPI) -> list[str]:
 
 def test_every_route_is_authenticated_or_explicitly_public() -> None:
     assert unprotected_routes(app) == []
+
+
+def test_every_deck_route_checks_deck_membership() -> None:
+    unchecked = [
+        f"{sorted(route.methods or ())} {route.path}"
+        for route in api_routes(app)
+        if route.path
+        and "{deck_id}" in route.path
+        and not any(_depends_on(route.dependant, dep) for dep in DECK_ROLE_DEPENDENCIES)
+    ]
+    assert unchecked == []
+
+
+def test_card_and_member_routes_are_nested_under_a_deck() -> None:
+    # Card and member IDs are only ever resolved inside a deck the caller can access.
+    loose = [
+        route.path
+        for route in api_routes(app)
+        if route.path
+        and ("{card_id}" in route.path or "/members" in route.path)
+        and "{deck_id}" not in route.path
+    ]
+    assert loose == []
 
 
 def test_public_routes_are_exactly_the_expected_set() -> None:

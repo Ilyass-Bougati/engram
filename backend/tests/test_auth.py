@@ -8,6 +8,7 @@ from sqlmodel import Session, select
 
 from app.config import settings
 from app.models import GlobalRole, RefreshToken, utcnow
+from app.rate_limit import login_failure_limiter, login_ip_limiter
 from app.routers.auth import REFRESH_COOKIE
 from tests.conftest import SignedIn
 from tests.helpers import (
@@ -49,18 +50,25 @@ def test_unknown_user_and_wrong_password_take_similar_time() -> None:
     create_user("alice")
     client = new_client()
 
-    def median_seconds(username: str) -> float:
-        durations = []
-        for _ in range(4):
-            started = time.perf_counter()
-            client.post("/api/auth/login", json={"username": username, "password": "wrong-pass"})
-            durations.append(time.perf_counter() - started)
-        return statistics.median(durations)
+    def seconds(username: str) -> float:
+        started = time.perf_counter()
+        response = client.post(
+            "/api/auth/login", json={"username": username, "password": "wrong-pass"}
+        )
+        assert response.status_code == 401
+        return time.perf_counter() - started
 
-    unknown = median_seconds("nobody")
-    wrong_password = median_seconds("alice")
+    unknown: list[float] = []
+    wrong_password: list[float] = []
+    # Interleaved so a stall on the machine hits both sides alike; limiters are reset because
+    # a 429 would short-circuit before argon2 and skew the timing.
+    for _ in range(7):
+        unknown.append(seconds("nobody"))
+        wrong_password.append(seconds("alice"))
+        for limiter in (login_ip_limiter, login_failure_limiter):
+            limiter.reset()
     # Without the dummy hash the unknown-user path skips argon2 and is ~20x faster.
-    assert 0.5 < unknown / wrong_password < 2.0
+    assert 0.5 < statistics.median(unknown) / statistics.median(wrong_password) < 2.0
 
 
 def test_deactivated_user_gets_the_same_login_error(signed_in: SignedIn) -> None:
