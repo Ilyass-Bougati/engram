@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { LogOutIcon, UserMinusIcon, UserPlusIcon } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router";
 
@@ -99,6 +100,7 @@ function MemberRow({ deck, member }: { deck: Deck; member: Member }) {
               }}
               aria-label={`Remove ${member.username}`}
             >
+              <UserMinusIcon aria-hidden />
               Remove
             </Button>
           </>
@@ -114,6 +116,7 @@ function MemberRow({ deck, member }: { deck: Deck; member: Member }) {
                   remove.mutate();
                 }}
               >
+                <LogOutIcon aria-hidden />
                 Leave deck
               </Button>
             )}
@@ -172,6 +175,7 @@ function ShareForm({ deck }: { deck: Deck }) {
       </div>
       <FormError error={share.error} />
       <Button type="submit" className="justify-self-end" disabled={share.isPending}>
+        <UserPlusIcon aria-hidden />
         {share.isPending ? "Sharing…" : "Share"}
       </Button>
     </form>

@@ -1,4 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { ArrowRightIcon, UploadIcon } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router";
 
@@ -113,6 +114,7 @@ export function AnkiImportDialog({
                   }}
                 >
                   Open deck
+                  <ArrowRightIcon aria-hidden />
                 </Link>
               </Button>
             </DialogFooter>
@@ -158,6 +160,7 @@ export function AnkiImportDialog({
                 </Button>
               </DialogClose>
               <Button type="submit" disabled={importPackage.isPending}>
+                <UploadIcon aria-hidden />
                 {!importPackage.isPending
                   ? "Import"
                   : step === "reading"

@@ -1,4 +1,11 @@
-import { ChevronRightIcon } from "lucide-react";
+import {
+  ChevronDownIcon,
+  ChevronRightIcon,
+  FolderIcon,
+  FolderOpenIcon,
+  GalleryVerticalEndIcon,
+  PlayIcon,
+} from "lucide-react";
 import { type CSSProperties, useState } from "react";
 import { Link } from "react-router";
 
@@ -34,8 +41,8 @@ function useOpenCollections(): [Set<string>, (key: string) => void] {
   return [open, toggle];
 }
 
-// Nested rows line their text up with the name of the collection above: the chevron is 1rem
-// wide with a 0.75rem gap.
+// Nested rows line their icon up with the name of the collection above: icons are 1rem wide
+// with a 0.75rem gap.
 function indent(depth: number): { className: string; style: CSSProperties } {
   return {
     className: "ps-[calc(1rem+var(--depth)*1.75rem)] sm:ps-[calc(1.25rem+var(--depth)*1.75rem)]",
@@ -50,11 +57,12 @@ function DeckRow({ node, depth }: { node: DeckLeaf; depth: number }) {
   return (
     <li
       className={cn(
-        "relative flex items-center gap-4 py-4 pe-4 hover:bg-muted sm:pe-5",
+        "relative flex items-center gap-3 py-4 pe-4 transition-colors duration-(--duration-fast) hover:bg-muted sm:pe-5",
         rowIndent.className,
       )}
       style={rowIndent.style}
     >
+      <GalleryVerticalEndIcon className="size-4 shrink-0 text-muted-foreground" aria-hidden />
       <div className="grid min-w-0 flex-1 gap-1">
         {/* The link covers the whole row; the Study button sits above it. */}
         <Link
@@ -71,6 +79,7 @@ function DeckRow({ node, depth }: { node: DeckLeaf; depth: number }) {
       {hasWork ? (
         <Button asChild variant="secondary" size="sm" className="relative">
           <Link to={`/decks/${deck.id}/study`} aria-label={`Study ${deckDisplayName(deck.name)}`}>
+            <PlayIcon aria-hidden />
             Study
           </Link>
         </Button>
@@ -105,18 +114,16 @@ function CollectionRow({
           onToggle(node.key);
         }}
         className={cn(
-          "flex w-full items-center gap-3 py-4 pe-4 text-left hover:bg-muted sm:pe-5",
+          "flex w-full items-center gap-3 py-4 pe-4 text-left transition-colors duration-(--duration-fast) hover:bg-muted sm:pe-5",
           rowIndent.className,
         )}
         style={rowIndent.style}
       >
-        <ChevronRightIcon
-          className={cn(
-            "size-4 shrink-0 text-muted-foreground transition-transform duration-(--duration-fast) ease-standard",
-            isOpen && "rotate-90",
-          )}
-          aria-hidden
-        />
+        {isOpen ? (
+          <FolderOpenIcon className="size-4 shrink-0 text-primary" aria-hidden />
+        ) : (
+          <FolderIcon className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+        )}
         <span className="grid min-w-0 flex-1 gap-1">
           <span className="truncate font-medium">{node.name}</span>
           <span className="text-sm text-muted-foreground tabular-nums">
@@ -124,12 +131,27 @@ function CollectionRow({
             {plural(node.cardCount, "card")}
           </span>
         </span>
+        <ChevronDownIcon
+          className={cn(
+            "size-4 shrink-0 text-muted-foreground transition-transform duration-(--duration-base) ease-standard",
+            isOpen && "rotate-180",
+          )}
+          aria-hidden
+        />
       </button>
-      {isOpen && (
-        <ul id={listId} className="divide-y divide-border border-t border-border">
+      {/* Slides open by animating the row height from 0 to the content's. Closed decks stay
+          in the page, inert, so they can't be focused or read out while hidden. */}
+      <div
+        className={cn(
+          "grid overflow-hidden transition-[grid-template-rows] duration-(--duration-base) ease-standard",
+          isOpen ? "grid-rows-[1fr]" : "grid-rows-[0fr]",
+        )}
+        inert={!isOpen}
+      >
+        <ul id={listId} className="min-h-0 divide-y divide-border border-t border-border">
           <DeckNodes nodes={node.children} depth={depth + 1} open={open} onToggle={onToggle} />
         </ul>
-      )}
+      </div>
     </li>
   );
 }

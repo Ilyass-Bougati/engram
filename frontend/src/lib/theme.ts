@@ -1,3 +1,4 @@
+import { type LucideIcon, MonitorIcon, MoonIcon, SunIcon } from "lucide-react";
 import { useSyncExternalStore } from "react";
 
 export type ThemePreference = "light" | "dark" | "system";
@@ -7,6 +8,12 @@ export const THEME_OPTIONS: { value: ThemePreference; label: string }[] = [
   { value: "light", label: "Light" },
   { value: "dark", label: "Dark" },
 ];
+
+export const THEME_ICONS: Record<ThemePreference, LucideIcon> = {
+  system: MonitorIcon,
+  light: SunIcon,
+  dark: MoonIcon,
+};
 
 const STORAGE_KEY = "engram-theme";
 

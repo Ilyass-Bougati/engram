@@ -1,3 +1,4 @@
+import { RotateCwIcon, TriangleAlertIcon, type LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -25,18 +26,35 @@ export function ErrorState({ error, onRetry }: { error: unknown; onRetry: () => 
       role="alert"
       className="grid justify-items-start gap-3 rounded-md border border-border bg-card p-6"
     >
-      <p className="font-medium">This didn't load.</p>
+      <p className="flex items-center gap-2 font-medium">
+        <TriangleAlertIcon className="size-4 shrink-0 text-destructive" aria-hidden />
+        This didn't load.
+      </p>
       <p className="text-sm text-muted-foreground">{errorMessage(error)}</p>
       <Button variant="secondary" size="sm" onClick={onRetry}>
+        <RotateCwIcon aria-hidden />
         Try again
       </Button>
     </div>
   );
 }
 
-export function EmptyState({ title, children }: { title: string; children?: ReactNode }) {
+export function EmptyState({
+  title,
+  icon: Icon,
+  children,
+}: {
+  title: string;
+  icon?: LucideIcon;
+  children?: ReactNode;
+}) {
   return (
     <div className="grid justify-items-start gap-3 rounded-md border border-dashed border-input px-6 py-10">
+      {Icon && (
+        <span className="grid size-10 place-items-center rounded-full bg-accent text-primary">
+          <Icon className="size-5" aria-hidden />
+        </span>
+      )}
       <p className="font-medium">{title}</p>
       {children}
     </div>

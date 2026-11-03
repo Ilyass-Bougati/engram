@@ -1,3 +1,4 @@
+import { ArrowLeftIcon } from "lucide-react";
 import { Link } from "react-router";
 
 import { Button } from "@/components/ui/button";
@@ -12,7 +13,10 @@ export function DeckNotFound() {
         again if you need it.
       </p>
       <Button asChild variant="secondary">
-        <Link to="/">Back to your decks</Link>
+        <Link to="/">
+          <ArrowLeftIcon aria-hidden />
+          Back to your decks
+        </Link>
       </Button>
     </div>
   );

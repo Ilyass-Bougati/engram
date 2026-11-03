@@ -55,14 +55,30 @@ function contrast(foreground: Rgba, background: Rgba): number {
   return ((lighter ?? 0) + 0.05) / ((darker ?? 0) + 0.05);
 }
 
+// The page as it can look anywhere: both ends of the gradient, plain or under either glow of
+// the ambient light at full strength. The glows never overlap (see body::before).
+function pages(scheme: Scheme): Rgba[] {
+  const pine = token("glow-pine", scheme);
+  const warm = token("glow-warm", scheme);
+  return ["paper-top", "paper-bottom"].flatMap((name) => {
+    const paper = token(name, scheme);
+    return [paper, over(pine, paper), over(warm, paper)];
+  });
+}
+
 // Glass is checked over everything that can end up behind it: the page, solid surfaces, and
 // text in the ink colors scrolling under the top bar (the worst case, since blur is ignored).
 function glassBackdrops(scheme: Scheme): Rgba[] {
-  const page = token("paper-top", scheme);
-  const behind = ["paper-top", "paper-bottom", "surface", "ink", "ink-muted"].map((name) =>
-    over(token(name, scheme), page),
-  );
+  const behind = pages(scheme).flatMap((page) => [
+    page,
+    ...["surface", "ink", "ink-muted"].map((name) => over(token(name, scheme), page)),
+  ]);
   return behind.map((backdrop) => over(token("glass-fill", scheme), backdrop));
+}
+
+// The review card's thin glass only ever has the page behind it.
+function thinGlassBackdrops(scheme: Scheme): Rgba[] {
+  return pages(scheme).map((page) => over(token("glass-fill-thin", scheme), page));
 }
 
 function solid(name: string, scheme: Scheme): Rgba[] {
@@ -79,7 +95,8 @@ const checks: {
   min: number;
 }[] = [];
 for (const text of ["ink", "ink-muted"]) {
-  for (const surface of ["paper-top", "paper-bottom", "surface", "surface-sunken", "pine-soft"]) {
+  checks.push({ label: `${text} on the page`, foreground: text, backgrounds: pages, min: TEXT });
+  for (const surface of ["surface", "surface-sunken", "pine-soft"]) {
     checks.push({
       label: `${text} on ${surface}`,
       foreground: text,
@@ -91,6 +108,12 @@ for (const text of ["ink", "ink-muted"]) {
     label: `${text} on glass`,
     foreground: text,
     backgrounds: glassBackdrops,
+    min: TEXT,
+  });
+  checks.push({
+    label: `${text} on thin glass`,
+    foreground: text,
+    backgrounds: thinGlassBackdrops,
     min: TEXT,
   });
 }
@@ -107,6 +130,12 @@ for (const rating of ["rating-again", "rating-hard", "rating-good", "rating-easy
     backgrounds: glassBackdrops,
     min: TEXT,
   });
+  checks.push({
+    label: `${rating} on thin glass`,
+    foreground: rating,
+    backgrounds: thinGlassBackdrops,
+    min: TEXT,
+  });
 }
 checks.push({
   label: "on-pine on pine",
@@ -120,27 +149,33 @@ checks.push({
   backgrounds: (s) => solid("danger", s),
   min: TEXT,
 });
-for (const surface of ["paper-top", "paper-bottom", "surface"]) {
+for (const control of ["line-strong", "focus"]) {
   checks.push({
-    label: `line-strong on ${surface}`,
-    foreground: "line-strong",
-    backgrounds: (s) => solid(surface, s),
+    label: `${control} on the page`,
+    foreground: control,
+    backgrounds: pages,
     min: UI,
   });
   checks.push({
-    label: `focus on ${surface}`,
-    foreground: "focus",
-    backgrounds: (s) => solid(surface, s),
+    label: `${control} on surface`,
+    foreground: control,
+    backgrounds: (s) => solid("surface", s),
     min: UI,
   });
 }
 checks.push({ label: "focus on glass", foreground: "focus", backgrounds: glassBackdrops, min: UI });
+checks.push({
+  label: "focus on thin glass",
+  foreground: "focus",
+  backgrounds: thinGlassBackdrops,
+  min: UI,
+});
 
 describe.each(["light", "dark"] as const)("%s theme", (scheme) => {
   test.each(checks)("$label", ({ foreground, backgrounds, min }) => {
     const worst = Math.min(
       ...backgrounds(scheme).map((bg) => contrast(token(foreground, scheme), bg)),
     );
-    expect(worst).toBeGreaterThanOrEqual(min);
+    expect(worst, `worst case ${worst.toFixed(2)}:1`).toBeGreaterThanOrEqual(min);
   });
 });

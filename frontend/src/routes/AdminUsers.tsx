@@ -1,4 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  CircleUserIcon,
+  ShieldCheckIcon,
+  ShieldOffIcon,
+  UserCheckIcon,
+  UserXIcon,
+} from "lucide-react";
 
 import { PageHeader } from "@/components/PageHeader";
 import { ErrorState, FormError, LoadingRows } from "@/components/states";
@@ -25,8 +32,18 @@ function UserRow({ account }: { account: AdminUser }) {
     <li className="grid gap-2 px-4 py-4 sm:px-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
         <div className="grid min-w-0 flex-1 gap-1">
-          <p className={cn("truncate font-medium", !account.is_active && "text-muted-foreground")}>
-            {account.username}
+          <p
+            className={cn(
+              "flex min-w-0 items-center gap-2 font-medium",
+              !account.is_active && "text-muted-foreground",
+            )}
+          >
+            {isAdmin ? (
+              <ShieldCheckIcon className="size-4 shrink-0 text-primary" aria-hidden />
+            ) : (
+              <CircleUserIcon className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+            )}
+            <span className="truncate">{account.username}</span>
             {isMe && <span className="font-normal text-muted-foreground"> (you)</span>}
           </p>
           <p className="text-sm text-muted-foreground">
@@ -47,6 +64,7 @@ function UserRow({ account }: { account: AdminUser }) {
                 update.mutate({ role: isAdmin ? "user" : "admin" });
               }}
             >
+              {isAdmin ? <ShieldOffIcon aria-hidden /> : <ShieldCheckIcon aria-hidden />}
               {isAdmin ? "Remove admin" : "Make admin"}
             </Button>
             <Button
@@ -58,6 +76,7 @@ function UserRow({ account }: { account: AdminUser }) {
                 update.mutate({ is_active: !account.is_active });
               }}
             >
+              {account.is_active ? <UserXIcon aria-hidden /> : <UserCheckIcon aria-hidden />}
               {account.is_active ? "Deactivate" : "Reactivate"}
             </Button>
           </div>

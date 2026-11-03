@@ -1,4 +1,5 @@
 import { useMutation } from "@tanstack/react-query";
+import { GlobeIcon, KeyRoundIcon, type LucideIcon, SunMoonIcon } from "lucide-react";
 import { useState, type ReactNode } from "react";
 
 import { PageHeader } from "@/components/PageHeader";
@@ -10,15 +11,17 @@ import { Select } from "@/components/ui/select";
 import { api, UserFacingError } from "@/lib/api";
 import { useAuth, useCurrentUser } from "@/lib/auth";
 import { formText } from "@/lib/form";
-import { THEME_OPTIONS, useThemePreference } from "@/lib/theme";
+import { THEME_ICONS, THEME_OPTIONS, useThemePreference } from "@/lib/theme";
 import type { SessionResponse, User } from "@/lib/types";
 
 function Section({
   title,
+  icon: Icon,
   description,
   children,
 }: {
   title: string;
+  icon: LucideIcon;
   description: string;
   children: ReactNode;
 }) {
@@ -29,7 +32,8 @@ function Section({
       className="grid gap-6 border-t border-border pt-8 md:grid-cols-[16rem_1fr] md:gap-12"
     >
       <div className="grid content-start gap-1">
-        <h2 id={id} className="text-lg font-semibold">
+        <h2 id={id} className="flex items-center gap-2 text-lg font-semibold">
+          <Icon className="size-5 shrink-0 text-primary" aria-hidden />
           {title}
         </h2>
         <p className="text-sm text-muted-foreground">{description}</p>
@@ -42,23 +46,27 @@ function Section({
 function ThemeSection() {
   const [theme, setTheme] = useThemePreference();
   return (
-    <Section title="Theme" description="Saved in this browser.">
+    <Section title="Theme" icon={SunMoonIcon} description="Saved in this browser.">
       <fieldset className="grid gap-3">
         <legend className="sr-only">Theme</legend>
-        {THEME_OPTIONS.map((option) => (
-          <label key={option.value} className="flex items-center gap-3 text-base">
-            <input
-              type="radio"
-              name="theme"
-              className="size-4 accent-primary"
-              checked={theme === option.value}
-              onChange={() => {
-                setTheme(option.value);
-              }}
-            />
-            {option.label}
-          </label>
-        ))}
+        {THEME_OPTIONS.map((option) => {
+          const OptionIcon = THEME_ICONS[option.value];
+          return (
+            <label key={option.value} className="flex items-center gap-3 text-base">
+              <input
+                type="radio"
+                name="theme"
+                className="size-4 accent-primary"
+                checked={theme === option.value}
+                onChange={() => {
+                  setTheme(option.value);
+                }}
+              />
+              <OptionIcon className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+              {option.label}
+            </label>
+          );
+        })}
       </fieldset>
     </Section>
   );
@@ -86,6 +94,7 @@ function TimezoneSection() {
   return (
     <Section
       title="Timezone"
+      icon={GlobeIcon}
       description="Your study day starts at 4:00 here: that's when new cards unlock."
     >
       <form
@@ -165,6 +174,7 @@ function PasswordSection() {
   return (
     <Section
       title="Password"
+      icon={KeyRoundIcon}
       description="Changing it signs you out on every other device and browser."
     >
       <form

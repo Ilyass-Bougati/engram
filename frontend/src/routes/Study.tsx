@@ -1,5 +1,15 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeftIcon, CheckIcon, XIcon } from "lucide-react";
+import {
+  ArrowLeftIcon,
+  ArrowRightIcon,
+  CalendarClockIcon,
+  CheckIcon,
+  CircleCheckBigIcon,
+  CircleCheckIcon,
+  CircleXIcon,
+  EyeIcon,
+  XIcon,
+} from "lucide-react";
 import { useEffect, useEffectEvent, useRef, useState, type ReactNode } from "react";
 import { Link, useParams } from "react-router";
 
@@ -136,11 +146,11 @@ function BasicReview({ card, rate, rating }: ReviewProps<BasicCard>) {
             ref={answer}
             tabIndex={-1}
             aria-label="Answer"
-            className="animate-fade-in border-t border-border pt-8 outline-none"
+            className="animate-rise-in border-t border-border pt-8 outline-none"
           >
             <Markdown className="text-review">{card.back}</Markdown>
           </div>
-          <div className="grid gap-3">
+          <div className="grid animate-rise-in gap-3">
             <RatingButtons ratings={[1, 2, 3, 4]} disabled={rating.isPending} onRate={rate} />
             <FormError error={rating.error} />
           </div>
@@ -153,7 +163,10 @@ function BasicReview({ card, rate, rating }: ReviewProps<BasicCard>) {
           onClick={reveal}
           aria-keyshortcuts="Space"
         >
-          Show answer
+          <span className="inline-flex items-center gap-2">
+            <EyeIcon aria-hidden />
+            Show answer
+          </span>
           <Kbd>Space</Kbd>
         </Button>
       )}
@@ -277,20 +290,28 @@ function QuizReview({ card, deckId, rate, rating, advance }: ReviewProps<QuizCar
             onClick={submit}
             aria-keyshortcuts="Enter"
           >
-            {answer.isPending ? "Checking…" : "Check answer"}
+            <span className="inline-flex items-center gap-2">
+              <CheckIcon aria-hidden />
+              {answer.isPending ? "Checking…" : "Check answer"}
+            </span>
             <kbd className="font-mono text-xs">Enter</kbd>
           </Button>
           <FormError error={answer.error} />
         </div>
       ) : (
-        <div ref={resultRef} tabIndex={-1} className="grid animate-fade-in gap-6 outline-none">
+        <div ref={resultRef} tabIndex={-1} className="grid animate-rise-in gap-6 outline-none">
           <div className="grid gap-3 border-t border-border pt-6">
             <p
               className={cn(
-                "font-semibold",
+                "flex items-start gap-2 font-semibold",
                 result.correct ? "text-rating-good" : "text-destructive",
               )}
             >
+              {result.correct ? (
+                <CircleCheckIcon className="mt-0.5 size-5 shrink-0" aria-hidden />
+              ) : (
+                <CircleXIcon className="mt-0.5 size-5 shrink-0" aria-hidden />
+              )}
               {result.correct
                 ? "Correct."
                 : "Not quite. This card is marked Again and comes back soon."}
@@ -306,7 +327,10 @@ function QuizReview({ card, deckId, rate, rating, advance }: ReviewProps<QuizCar
                 advance(next);
               }}
             >
-              Next card
+              <span className="inline-flex items-center gap-2">
+                Next card
+                <ArrowRightIcon aria-hidden />
+              </span>
               <Kbd>Enter</Kbd>
             </Button>
           ) : (
@@ -331,7 +355,14 @@ function Finished({ deck, study, reviewed }: { deck: Deck; study: StudyNext; rev
     detail = `You've had today's ${plural(deck.new_cards_per_day, "new card")}. More come after 4:00 tomorrow, or raise the limit in deck settings.`;
   }
   return (
-    <div className="grid justify-items-start gap-6">
+    <div className="grid animate-rise-in justify-items-start gap-6">
+      <span className="grid size-12 place-items-center rounded-full bg-accent text-primary">
+        {reviewed > 0 ? (
+          <CircleCheckBigIcon className="size-6" aria-hidden />
+        ) : (
+          <CalendarClockIcon className="size-6" aria-hidden />
+        )}
+      </span>
       <div className="grid gap-2">
         <h1 className="text-2xl font-semibold">
           {reviewed > 0 ? "Done for now" : "Nothing to study right now"}
@@ -342,7 +373,10 @@ function Finished({ deck, study, reviewed }: { deck: Deck; study: StudyNext; rev
         </p>
       </div>
       <Button asChild>
-        <Link to={`/decks/${deck.id}`}>Back to deck</Link>
+        <Link to={`/decks/${deck.id}`}>
+          <ArrowLeftIcon aria-hidden />
+          Back to deck
+        </Link>
       </Button>
     </div>
   );
@@ -392,6 +426,7 @@ function StudySession({ deck }: { deck: Deck }) {
   );
 
   let body: ReactNode;
+  let bodyKey = "loading";
   if (initial.isPending) {
     body = (
       <div role="status" aria-label="Loading the next card" className="grid gap-4">
@@ -400,6 +435,7 @@ function StudySession({ deck }: { deck: Deck }) {
       </div>
     );
   } else if (initial.isError) {
+    bodyKey = "error";
     body = <ErrorState error={initial.error} onRetry={() => void initial.refetch()} />;
   } else if (study?.card) {
     const props = {
@@ -411,11 +447,12 @@ function StudySession({ deck }: { deck: Deck }) {
       advance,
     };
     // Keyed per review, not per card: a card failed moments ago can come straight back.
+    bodyKey = `${study.card.id}-${String(reviewed)}`;
     body =
       study.card.type === "basic" ? (
-        <BasicReview key={`${study.card.id}-${String(reviewed)}`} card={study.card} {...props} />
+        <BasicReview card={study.card} {...props} />
       ) : (
-        <QuizReview key={`${study.card.id}-${String(reviewed)}`} card={study.card} {...props} />
+        <QuizReview card={study.card} {...props} />
       );
   }
 
@@ -424,7 +461,7 @@ function StudySession({ deck }: { deck: Deck }) {
       <header className="mx-auto flex w-[calc(100%-2rem)] max-w-2xl items-center justify-between gap-4 py-4 sm:w-[calc(100%-3rem)]">
         <Link
           to={`/decks/${deck.id}`}
-          className="inline-flex min-w-0 items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
+          className="inline-flex min-w-0 items-center gap-1.5 text-sm text-muted-foreground transition-colors duration-(--duration-fast) hover:text-foreground"
         >
           <ArrowLeftIcon className="size-4 shrink-0" aria-hidden />
           <span className="truncate">{deckDisplayName(deck.name)}</span>
@@ -441,9 +478,12 @@ function StudySession({ deck }: { deck: Deck }) {
             ref={cardRef}
             tabIndex={-1}
             aria-label="Card"
-            className="glass grid h-fit w-full max-w-2xl gap-8 rounded-lg p-6 outline-none sm:p-10"
+            className="glass-thin h-fit w-full max-w-2xl rounded-lg p-6 outline-none sm:p-10"
           >
-            {body}
+            {/* Each card rises in; the glass around it stays put. */}
+            <div key={bodyKey} className="grid animate-rise-in gap-8">
+              {body}
+            </div>
           </article>
         )}
       </main>
@@ -454,6 +494,13 @@ function StudySession({ deck }: { deck: Deck }) {
 export function StudyPage() {
   const { deckId = "" } = useParams();
   const deck = useDeck(deckId);
+  useEffect(() => {
+    const root = document.documentElement;
+    root.dataset.scene = "study";
+    return () => {
+      delete root.dataset.scene;
+    };
+  }, []);
   return (
     <div className="flex min-h-dvh flex-col">
       <title>{`Study${deck.data ? ` · ${deckDisplayName(deck.data.name)}` : ""} · Engram`}</title>

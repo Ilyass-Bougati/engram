@@ -1,4 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  BanIcon,
+  CalendarXIcon,
+  CheckIcon,
+  CircleCheckIcon,
+  ClockIcon,
+  CopyIcon,
+  LinkIcon,
+  type LucideIcon,
+} from "lucide-react";
 import { useState } from "react";
 
 import { PageHeader } from "@/components/PageHeader";
@@ -26,6 +36,13 @@ const STATE_LABELS: Record<InviteState, string> = {
   used: "Used",
   expired: "Expired",
   revoked: "Revoked",
+};
+
+const STATE_ICONS: Record<InviteState, LucideIcon> = {
+  pending: ClockIcon,
+  used: CircleCheckIcon,
+  expired: CalendarXIcon,
+  revoked: BanIcon,
 };
 
 function NewInviteDialog({ token, onClose }: { token: string | null; onClose: () => void }) {
@@ -77,6 +94,7 @@ function NewInviteDialog({ token, onClose }: { token: string | null; onClose: ()
               });
             }}
           >
+            {copied ? <CheckIcon aria-hidden /> : <CopyIcon aria-hidden />}
             Copy link
           </Button>
         </DialogFooter>
@@ -102,11 +120,21 @@ function InviteRow({ invite }: { invite: InviteSummary }) {
     detail = "Can no longer be used";
   }
 
+  const StateIcon = STATE_ICONS[invite.state];
   return (
     <li className="grid gap-2 px-4 py-4 sm:px-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
         <div className="grid min-w-0 flex-1 gap-1">
-          <p className={cn("font-medium", invite.state !== "pending" && "text-muted-foreground")}>
+          <p
+            className={cn(
+              "flex items-center gap-2 font-medium",
+              invite.state !== "pending" && "text-muted-foreground",
+            )}
+          >
+            <StateIcon
+              className={cn("size-4 shrink-0", invite.state === "pending" && "text-primary")}
+              aria-hidden
+            />
             {STATE_LABELS[invite.state]}
           </p>
           <p className="text-sm text-muted-foreground">
@@ -122,6 +150,7 @@ function InviteRow({ invite }: { invite: InviteSummary }) {
               revoke.mutate();
             }}
           >
+            <BanIcon aria-hidden />
             {revoke.isPending ? "Revoking…" : "Revoke"}
           </Button>
         )}
@@ -158,6 +187,7 @@ export function AdminInvitesPage() {
               create.mutate();
             }}
           >
+            <LinkIcon aria-hidden />
             {create.isPending ? "Creating…" : "Create invite link"}
           </Button>
         }
@@ -169,7 +199,7 @@ export function AdminInvitesPage() {
       ) : invites.isError ? (
         <ErrorState error={invites.error} onRetry={() => void invites.refetch()} />
       ) : invites.data.length === 0 ? (
-        <EmptyState title="No invites yet">
+        <EmptyState title="No invites yet" icon={LinkIcon}>
           <p className="text-sm text-muted-foreground">
             Create an invite link and send it to someone. It's the only way to sign up.
           </p>

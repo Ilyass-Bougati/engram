@@ -1,5 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronDownIcon } from "lucide-react";
+import {
+  ChevronDownIcon,
+  FileJsonIcon,
+  GalleryVerticalEndIcon,
+  PackageIcon,
+  PlusIcon,
+  UploadIcon,
+} from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router";
 
@@ -136,17 +143,22 @@ export function DecksPage() {
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button variant="secondary" disabled={importDeck.isPending}>
+            <UploadIcon aria-hidden />
             {importDeck.isPending ? "Importing…" : "Import"}
             <ChevronDownIcon aria-hidden />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          <DropdownMenuItem onSelect={picker.open}>Engram deck (.json)</DropdownMenuItem>
+          <DropdownMenuItem onSelect={picker.open}>
+            <FileJsonIcon aria-hidden />
+            Engram deck (.json)
+          </DropdownMenuItem>
           <DropdownMenuItem
             onSelect={() => {
               setDialog("anki");
             }}
           >
+            <PackageIcon aria-hidden />
             Anki package (.apkg)
           </DropdownMenuItem>
         </DropdownMenuContent>
@@ -156,6 +168,7 @@ export function DecksPage() {
           setDialog("new");
         }}
       >
+        <PlusIcon aria-hidden />
         New deck
       </Button>
     </>
@@ -172,7 +185,7 @@ export function DecksPage() {
       ) : decks.isError ? (
         <ErrorState error={decks.error} onRetry={() => void decks.refetch()} />
       ) : decks.data.length === 0 ? (
-        <EmptyState title="No decks yet">
+        <EmptyState title="No decks yet" icon={GalleryVerticalEndIcon}>
           <p className="text-sm text-muted-foreground">
             Create a deck and add cards, or import one from Anki or a JSON deck file.
           </p>

@@ -170,6 +170,24 @@ test("screenshots of every screen", async ({ browser, page, apiAs }) => {
     await expect(page.getByRole("heading", { name: "Linear algebra basics" })).toBeVisible();
     await expect(page.getByRole("region", { name: "Cards" }).getByRole("listitem")).toHaveCount(4);
     await capture(page, "deck", variant);
+    if (variant.width === 1440) {
+      // A short window, scrolled, so the search bar sticks and turns to glass over the cards.
+      await page.setViewportSize({ width: 1440, height: 360 });
+      await page.evaluate(() => {
+        window.scrollTo(0, document.body.scrollHeight);
+      });
+      const toolbar = page.getByRole("searchbox", { name: "Search cards" }).locator("xpath=../..");
+      await expect(toolbar).toHaveClass(/\bglass\b/);
+      await page.mouse.move(0, 0);
+      await page.screenshot({
+        path: `screenshots/phase7/deck-scrolled-1440-${variant.colorScheme}.png`,
+        animations: "disabled",
+      });
+      await page.evaluate(() => {
+        window.scrollTo(0, 0);
+      });
+      await page.setViewportSize(variant);
+    }
 
     await go(page, "/");
     await page.getByRole("button", { name: "Import" }).click();

@@ -12,13 +12,17 @@
   /* Warm neutrals. The page background is a low-contrast vertical gradient. */
   --paper-top: light-dark(#f4f2ee, #141517);
   --paper-bottom: light-dark(#ebe8e2, #191a1d);
+  /* Ambient light behind everything: pine from the top left, warm sand from the bottom right.
+     It gives glass something to blur. Text on the page is checked over both at full strength. */
+  --glow-pine: light-dark(rgb(40 95 69 / 0.1), rgb(125 181 146 / 0.08));
+  --glow-warm: light-dark(rgb(176 122 48 / 0.12), rgb(217 167 90 / 0.06));
   --surface: light-dark(#fbfaf8, #1e1f22);
   --surface-sunken: light-dark(#efede8, #18191b);
   --ink: light-dark(#1c1b19, #eceae6);
   --ink-muted: light-dark(#57544e, #b0ada6);
   --line: light-dark(rgb(28 27 25 / 0.12), rgb(236 234 230 / 0.12));
   /* Control outlines: solid, and at least 3:1 against surfaces (WCAG 1.4.11). */
-  --line-strong: light-dark(#807c74, #75726c);
+  --line-strong: light-dark(#7b776f, #75726c);
 
   /* One accent: pine. No purple, indigo, violet or cyan anywhere. */
   --pine: light-dark(#285f45, #7db592);
@@ -43,13 +47,18 @@
   --chart-4: light-dark(#1f4d37, #b0dcbf);
 
   /*
-   * Glass: only for the review card, the top navigation, and dialogs/popovers. Fairly opaque
-   * fill, strong blur, one edge (a border), no shadow.
+   * Glass: only for what floats above the page: the top bars, dialogs and menus, and the review
+   * card. Strong blur, one edge (a border) with a faint highlight along the top, no shadow.
+   * The regular fill is for glass that text scrolls under; the thin fill is for the review card,
+   * which only ever has the page behind it, so more of the ambient light shows through.
    */
   --glass-fill: light-dark(rgb(251 250 248 / 0.84), rgb(30 31 34 / 0.88));
+  --glass-fill-thin: light-dark(rgb(251 250 248 / 0.6), rgb(30 31 34 / 0.6));
   --glass-edge: light-dark(rgb(28 27 25 / 0.1), rgb(236 234 230 / 0.1));
+  --glass-highlight: light-dark(rgb(255 255 255 / 0.7), rgb(255 255 255 / 0.06));
   --glass-blur: 24px;
-  --scrim: light-dark(rgb(28 27 25 / 0.32), rgb(0 0 0 / 0.56));
+  --scrim: light-dark(rgb(28 27 25 / 0.28), rgb(0 0 0 / 0.5));
+  --scrim-blur: 6px;
 
   /*
    * Code highlighting (Shiki's CSS-variables theme). Aliases of text colors tested above, so
@@ -89,14 +98,18 @@
 @media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
   :root {
     --glass-fill: var(--surface);
+    --glass-fill-thin: var(--surface);
     --glass-edge: var(--line-strong);
+    --glass-highlight: transparent;
     --glass-blur: 0px;
+    --scrim-blur: 0px;
   }
 }
 
 @supports not (backdrop-filter: blur(1px)) {
   :root {
     --glass-fill: var(--surface);
+    --glass-fill-thin: var(--surface);
   }
 }
 

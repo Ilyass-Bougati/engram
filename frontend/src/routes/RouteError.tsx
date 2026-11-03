@@ -1,3 +1,5 @@
+import { RotateCwIcon } from "lucide-react";
+
 import { CenteredPage } from "@/components/CenteredPage";
 import { Button } from "@/components/ui/button";
 
@@ -17,6 +19,7 @@ export function RouteError() {
           window.location.reload();
         }}
       >
+        <RotateCwIcon aria-hidden />
         Reload
       </Button>
     </CenteredPage>

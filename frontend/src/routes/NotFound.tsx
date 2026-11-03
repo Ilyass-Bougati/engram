@@ -1,3 +1,4 @@
+import { ArrowLeftIcon } from "lucide-react";
 import { Link } from "react-router";
 
 import { CenteredPage } from "@/components/CenteredPage";
@@ -14,7 +15,10 @@ export function NotFound() {
         </p>
       </div>
       <Button asChild className="self-start">
-        <Link to="/">Go to your decks</Link>
+        <Link to="/">
+          <ArrowLeftIcon aria-hidden />
+          Go to your decks
+        </Link>
       </Button>
     </CenteredPage>
   );

@@ -49,13 +49,25 @@
 
   --ease-standard: cubic-bezier(0.2, 0, 0, 1);
 
-  /* Dialogs fade and settle into place: they communicate "opened", nothing more. */
+  /*
+   * Motion says what changed and stops: things arrive by fading and rising a few pixels, and
+   * leave faster than they came. Nothing bounces, loops or moves on its own.
+   */
   --animate-fade-in: fade-in var(--duration-slow) var(--ease-standard);
+  --animate-fade-out: fade-out var(--duration-fast) var(--ease-standard) forwards;
   --animate-dialog-in: dialog-in var(--duration-slow) var(--ease-standard);
-  --animate-menu-in: fade-in var(--duration-fast) var(--ease-standard);
+  --animate-dialog-out: dialog-out var(--duration-fast) var(--ease-standard) forwards;
+  --animate-menu-in: menu-in var(--duration-fast) var(--ease-standard);
+  --animate-rise-in: rise-in var(--duration-base) var(--ease-standard);
 
   @keyframes fade-in {
     from {
+      opacity: 0;
+    }
+  }
+
+  @keyframes fade-out {
+    to {
       opacity: 0;
     }
   }
@@ -64,12 +76,34 @@
     from {
       opacity: 0;
       /* Composes with the centering `translate` property set by the utilities. */
-      transform: translateY(8px);
+      transform: translateY(8px) scale(0.98);
+    }
+  }
+
+  @keyframes dialog-out {
+    to {
+      opacity: 0;
+      transform: translateY(4px) scale(0.98);
+    }
+  }
+
+  /* Grows from the corner the menu is anchored to. */
+  @keyframes menu-in {
+    from {
+      opacity: 0;
+      transform: scale(0.96);
+    }
+  }
+
+  /* Pages, a new review card, a revealed answer. */
+  @keyframes rise-in {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
     }
   }
 }
 
-/* shadcn/ui's semantic names, mapped onto the Engram tokens instead of its default theme. */
 @theme inline {
   --color-background: var(--paper-top);
   --color-foreground: var(--ink);
@@ -102,20 +136,51 @@
   background-color: var(--glass-fill);
   backdrop-filter: blur(var(--glass-blur)) saturate(140%);
   border: 1px solid var(--glass-edge);
+  box-shadow: inset 0 1px 0 var(--glass-highlight);
+}
+
+@utility glass-thin {
+  background-color: var(--glass-fill-thin);
+  backdrop-filter: blur(var(--glass-blur)) saturate(140%);
+  border: 1px solid var(--glass-edge);
+  box-shadow: inset 0 1px 0 var(--glass-highlight);
 }
 
 @layer base {
   html {
     font-family: var(--font-sans);
     color: var(--ink);
-    background-color: var(--paper-top);
+    /* The gradient's last color, so overscroll and anything past the viewport match. */
+    background-color: var(--paper-bottom);
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
   }
 
   body {
     min-height: 100dvh;
-    background: linear-gradient(180deg, var(--paper-top), var(--paper-bottom));
+  }
+
+  /* The page and its ambient light, pinned to the viewport so it doesn't scroll away. The two
+     glows are sized to the viewport and fade out before they could meet, at any screen shape. */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background:
+      radial-gradient(70% 55% at 0% 0%, var(--glow-pine), transparent 70%),
+      radial-gradient(60% 50% at 100% 100%, var(--glow-warm), transparent 70%),
+      linear-gradient(180deg, var(--paper-top), var(--paper-bottom));
+  }
+
+  /* While studying, the pine light moves behind the review card so its glass has something
+     to frost. It still never reaches the warm glow. */
+  :root[data-scene="study"] body::before {
+    background:
+      radial-gradient(60% 45% at 50% 30%, var(--glow-pine), transparent 70%),
+      radial-gradient(60% 50% at 100% 100%, var(--glow-warm), transparent 70%),
+      linear-gradient(180deg, var(--paper-top), var(--paper-bottom));
   }
 
   code,

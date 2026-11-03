@@ -1,5 +1,14 @@
 import { useQuery } from "@tanstack/react-query";
 import type { ReactNode } from "react";
+import {
+  ArrowLeftIcon,
+  ChartColumnIcon,
+  FlameIcon,
+  type LucideIcon,
+  Repeat2Icon,
+  TargetIcon,
+  TrophyIcon,
+} from "lucide-react";
 import { Link } from "react-router";
 
 import { PageHeader } from "@/components/PageHeader";
@@ -14,10 +23,23 @@ import { CardStatesBar, CardStatesLegend, STATES } from "@/routes/stats/CardStat
 import { percent, rememberedText } from "@/routes/stats/chart";
 import { RetentionChart } from "@/routes/stats/RetentionChart";
 
-function StatTile({ label, value, detail }: { label: string; value: string; detail: string }) {
+function StatTile({
+  label,
+  icon: Icon,
+  value,
+  detail,
+}: {
+  label: string;
+  icon: LucideIcon;
+  value: string;
+  detail: string;
+}) {
   return (
     <div className="grid content-start gap-1 rounded-md border border-border bg-card p-4">
-      <dt className="text-sm text-muted-foreground">{label}</dt>
+      <dt className="flex items-center gap-2 text-sm text-muted-foreground">
+        <Icon className="size-4 shrink-0 text-primary" aria-hidden />
+        {label}
+      </dt>
       <dd className="text-2xl font-semibold tabular-nums">{value}</dd>
       <dd className="text-sm text-muted-foreground">{detail}</dd>
     </div>
@@ -119,12 +141,15 @@ function StatsContent({ stats }: { stats: Stats }) {
   const { activity, retention_last_30_days: recent } = stats;
   if (activity.total_reviews === 0 && stats.decks.length === 0) {
     return (
-      <EmptyState title="Nothing to show yet">
+      <EmptyState title="Nothing to show yet" icon={ChartColumnIcon}>
         <p className="text-sm text-muted-foreground">
           Create or import a deck and study it; your activity shows up here.
         </p>
         <Button asChild size="sm">
-          <Link to="/">Go to your decks</Link>
+          <Link to="/">
+            <ArrowLeftIcon aria-hidden />
+            Go to your decks
+          </Link>
         </Button>
       </EmptyState>
     );
@@ -134,21 +159,25 @@ function StatsContent({ stats }: { stats: Stats }) {
       <dl className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatTile
           label="Current streak"
+          icon={FlameIcon}
           value={plural(activity.current_streak, "day")}
           detail={activity.current_streak > 0 ? "Keep it going today" : "Study today to start one"}
         />
         <StatTile
           label="Longest streak"
+          icon={TrophyIcon}
           value={plural(activity.longest_streak, "day")}
           detail={`${plural(activity.days_studied, "day")} studied in all`}
         />
         <StatTile
           label="Reviews"
+          icon={Repeat2Icon}
           value={activity.total_reviews.toLocaleString()}
           detail="All time"
         />
         <StatTile
           label="Retention"
+          icon={TargetIcon}
           value={percent(recent)}
           detail={
             recent.reviews

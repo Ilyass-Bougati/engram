@@ -160,7 +160,7 @@ export function Specimen() {
               Glass: the review card, the top bar, dialogs and menus
             </h3>
             <div className="py-6 sm:py-10">
-              <article className="glass mx-auto grid w-full max-w-2xl gap-8 rounded-lg p-6 sm:p-10">
+              <article className="glass-thin mx-auto grid w-full max-w-2xl gap-8 rounded-lg p-6 sm:p-10">
                 <p className="text-review">
                   What is the determinant of a 2 × 2 matrix [[a, b], [c, d]]?
                 </p>

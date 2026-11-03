@@ -1,5 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeftIcon, CheckIcon, XIcon } from "lucide-react";
+import {
+  ArrowLeftIcon,
+  CheckIcon,
+  EyeIcon,
+  ListChecksIcon,
+  PlusIcon,
+  RectangleHorizontalIcon,
+  Trash2Icon,
+  XIcon,
+} from "lucide-react";
 import { useRef, useState, type ReactNode } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 
@@ -113,7 +122,11 @@ function Preview({ draft }: { draft: Draft }) {
   const prompt = draft.type === "basic" ? draft.front : draft.question;
   return (
     <section aria-labelledby="preview-heading" className="grid content-start gap-3">
-      <h2 id="preview-heading" className="text-sm font-medium text-muted-foreground">
+      <h2
+        id="preview-heading"
+        className="flex items-center gap-2 text-sm font-medium text-muted-foreground"
+      >
+        <EyeIcon className="size-4 shrink-0" aria-hidden />
         Preview
       </h2>
       <div className="grid gap-6 rounded-lg border border-border bg-card p-6 text-lg">
@@ -193,8 +206,8 @@ function TypeChoice({
   onChange: (type: Draft["type"]) => void;
 }) {
   const choices = [
-    { value: "basic", label: "Front and back" },
-    { value: "quiz", label: "Multiple choice" },
+    { value: "basic", label: "Front and back", icon: RectangleHorizontalIcon },
+    { value: "quiz", label: "Multiple choice", icon: ListChecksIcon },
   ] as const;
   return (
     <fieldset className="grid gap-2">
@@ -203,7 +216,7 @@ function TypeChoice({
         {choices.map((choice) => (
           <label
             key={choice.value}
-            className="flex h-10 cursor-pointer items-center rounded-sm border border-input bg-card px-4 text-sm font-medium has-checked:border-primary has-checked:bg-accent has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-ring"
+            className="flex h-10 cursor-pointer items-center gap-2 rounded-sm border border-input bg-card px-4 text-sm font-medium transition-colors duration-(--duration-fast) has-checked:border-primary has-checked:bg-accent has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-ring"
           >
             <input
               type="radio"
@@ -215,6 +228,7 @@ function TypeChoice({
               }}
               className="sr-only"
             />
+            <choice.icon className="size-4 shrink-0 text-muted-foreground" aria-hidden />
             {choice.label}
           </label>
         ))}
@@ -314,6 +328,7 @@ function OptionsEditor({
             update({ options: [...draft.options, blankOption()] });
           }}
         >
+          <PlusIcon aria-hidden />
           Add option
         </Button>
         <p className="text-sm text-muted-foreground">
@@ -338,6 +353,7 @@ function DeleteCard({ deck, card }: { deck: Deck; card: Card }) {
     <Dialog>
       <DialogTrigger asChild>
         <Button variant="ghost" className="text-destructive">
+          <Trash2Icon aria-hidden />
           Delete card
         </Button>
       </DialogTrigger>
@@ -361,6 +377,7 @@ function DeleteCard({ deck, card }: { deck: Deck; card: Card }) {
               remove.mutate();
             }}
           >
+            <Trash2Icon aria-hidden />
             {remove.isPending ? "Deleting…" : "Delete card"}
           </Button>
         </DialogFooter>
@@ -514,6 +531,7 @@ function CardForm({ deck, card }: { deck: Deck; card: Card | undefined }) {
       </div>
       <div className="flex flex-wrap items-center gap-2 lg:col-start-1">
         <Button type="submit" form="card-form" disabled={save.isPending}>
+          <CheckIcon aria-hidden />
           {save.isPending ? "Saving…" : isNew ? "Save card" : "Save changes"}
         </Button>
         {isNew && (
@@ -525,6 +543,7 @@ function CardForm({ deck, card }: { deck: Deck; card: Card | undefined }) {
               submit(true);
             }}
           >
+            <PlusIcon aria-hidden />
             Save and add another
           </Button>
         )}
@@ -553,10 +572,10 @@ export function CardEditorPage() {
   const backLink = (
     <Link
       to={`/decks/${deckId}`}
-      className="inline-flex items-center gap-1.5 justify-self-start text-sm text-muted-foreground hover:text-foreground"
+      className="inline-flex items-center gap-1.5 justify-self-start text-sm text-muted-foreground transition-colors duration-(--duration-fast) hover:text-foreground"
     >
       <ArrowLeftIcon className="size-4" aria-hidden />
-      {deck.data?.name ?? "Back to deck"}
+      {deck.data ? deckDisplayName(deck.data.name) : "Back to deck"}
     </Link>
   );
 

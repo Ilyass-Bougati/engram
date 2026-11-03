@@ -18,7 +18,7 @@ export function DropdownMenuContent({
       <MenuPrimitive.Content
         sideOffset={sideOffset}
         className={cn(
-          "glass z-50 min-w-48 rounded-md p-1 text-sm text-popover-foreground animate-menu-in",
+          "glass z-50 min-w-48 origin-(--radix-dropdown-menu-content-transform-origin) rounded-md p-1 text-sm text-popover-foreground animate-menu-in data-[state=closed]:animate-fade-out",
           className,
         )}
         {...props}
@@ -28,7 +28,7 @@ export function DropdownMenuContent({
 }
 
 const itemClass =
-  "relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 outline-none select-none data-disabled:opacity-50 data-highlighted:bg-accent [&_svg]:size-4";
+  "relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 outline-none select-none transition-colors duration-(--duration-fast) data-disabled:opacity-50 data-highlighted:bg-accent [&_svg]:size-4 [&_svg]:shrink-0 [&_svg]:text-muted-foreground";
 
 export function DropdownMenuItem({
   className,

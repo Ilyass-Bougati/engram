@@ -1,4 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { Trash2Icon } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router";
 
@@ -56,6 +57,7 @@ function DeleteDeck({ deck, onCancel }: { deck: Deck; onCancel: () => void }) {
             remove.mutate();
           }}
         >
+          <Trash2Icon aria-hidden />
           {remove.isPending ? "Deleting…" : "Delete deck"}
         </Button>
       </DialogFooter>
@@ -183,6 +185,7 @@ function SettingsForm({ deck, onDelete }: { deck: Deck; onDelete: () => void }) 
             Removes the deck for every member, with all cards and review history.
           </p>
           <Button variant="danger" className="justify-self-start" onClick={onDelete}>
+            <Trash2Icon aria-hidden />
             Delete deck…
           </Button>
         </section>

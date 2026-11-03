@@ -5,8 +5,25 @@ import {
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
-import { EllipsisIcon, SearchIcon } from "lucide-react";
-import { useEffect, useState } from "react";
+import {
+  ChevronDownIcon,
+  DownloadIcon,
+  EllipsisIcon,
+  GalleryVerticalEndIcon,
+  GitForkIcon,
+  ListChecksIcon,
+  PlayIcon,
+  PlusIcon,
+  RectangleHorizontalIcon,
+  SearchIcon,
+  SearchXIcon,
+  SettingsIcon,
+  UploadIcon,
+  UserPlusIcon,
+  UsersIcon,
+  XIcon,
+} from "lucide-react";
+import { type RefObject, useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router";
 
 import { DeckNotFound } from "@/components/DeckNotFound";
@@ -27,6 +44,7 @@ import { api } from "@/lib/api";
 import { deckDisplayName, deckPath } from "@/lib/collections";
 import { downloadFromApi } from "@/lib/download";
 import { readJsonFile } from "@/lib/form";
+import { cn } from "@/lib/cn";
 import { firstLine, plural, studyCountsText } from "@/lib/format";
 import { invalidateDeck, isNotFound, useDeck } from "@/lib/queries";
 import type { Card, CardPage, Deck, TagCount } from "@/lib/types";
@@ -44,8 +62,31 @@ function cardsPath(deckId: string, q: string, tag: string, cursor: string | null
   return `/decks/${deckId}/cards${query ? `?${query}` : ""}`;
 }
 
+// True once the element has scrolled up against the top bar, where it sticks.
+function useStuck(): [RefObject<HTMLDivElement | null>, boolean] {
+  const sentinel = useRef<HTMLDivElement>(null);
+  const [stuck, setStuck] = useState(false);
+  useEffect(() => {
+    const element = sentinel.current;
+    if (!element) return;
+    // 4rem: the top bar plus the gap the toolbar keeps below it.
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        setStuck(entry !== undefined && !entry.isIntersecting && entry.boundingClientRect.top < 64);
+      },
+      { rootMargin: "-64px 0px 0px 0px" },
+    );
+    observer.observe(element);
+    return () => {
+      observer.disconnect();
+    };
+  }, []);
+  return [sentinel, stuck];
+}
+
 function CardRow({ deckId, card }: { deckId: string; card: Card }) {
   const prompt = card.type === "basic" ? card.front : card.question;
+  const KindIcon = card.type === "basic" ? RectangleHorizontalIcon : ListChecksIcon;
   const kind =
     card.type === "basic"
       ? "Front and back"
@@ -54,14 +95,17 @@ function CardRow({ deckId, card }: { deckId: string; card: Card }) {
     <li>
       <Link
         to={`/decks/${deckId}/cards/${card.id}`}
-        className="grid gap-1 px-4 py-3 hover:bg-muted sm:px-5"
+        className="grid gap-1 px-4 py-3 transition-colors duration-(--duration-fast) hover:bg-muted sm:px-5"
       >
         <Markdown line className="font-medium">
           {firstLine(prompt)}
         </Markdown>
-        <span className="truncate text-sm text-muted-foreground">
-          {kind}
-          {card.tags.length > 0 && <> · {card.tags.join(", ")}</>}
+        <span className="flex min-w-0 items-center gap-1.5 text-sm text-muted-foreground">
+          <KindIcon className="size-3.5 shrink-0" aria-hidden />
+          <span className="truncate">
+            {kind}
+            {card.tags.length > 0 && <> · {card.tags.join(", ")}</>}
+          </span>
         </span>
       </Link>
     </li>
@@ -100,6 +144,7 @@ function CardList({ deck }: { deck: Deck }) {
     placeholderData: keepPreviousData,
   });
 
+  const [sentinel, stuck] = useStuck();
   const filtered = q !== "" || tag !== "";
   const allCards = cards.data?.pages.flatMap((page) => page.cards) ?? [];
 
@@ -109,55 +154,65 @@ function CardList({ deck }: { deck: Deck }) {
         Cards
       </h2>
       {(deck.card_count > 0 || filtered) && (
-        <div className="flex flex-col gap-2 sm:flex-row">
-          <div className="relative flex-1">
-            <SearchIcon
-              className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
-              aria-hidden
-            />
-            <Input
-              type="search"
-              aria-label="Search cards"
-              placeholder="Search cards"
-              className="pl-9"
-              value={search}
-              onChange={(event) => {
-                setSearch(event.target.value);
-              }}
-            />
-          </div>
-          <Select
-            aria-label="Filter by tag"
-            className="sm:w-56"
-            value={tag}
-            onChange={(event) => {
-              const value = event.target.value;
-              setParams(
-                (current) => {
-                  const next = new URLSearchParams(current);
-                  if (value) next.set("tag", value);
-                  else next.delete("tag");
-                  return next;
-                },
-                { replace: true },
-              );
-            }}
+        <>
+          <div ref={sentinel} aria-hidden className="-mb-4 h-0" />
+          {/* Sticks under the top bar on wider screens and turns to glass while it floats
+              over the cards; the negative margin keeps it in line with the list at rest. */}
+          <div
+            className={cn(
+              "z-30 -m-2 flex flex-col gap-2 rounded-md border border-transparent p-2 transition-[background-color,border-color] duration-(--duration-base) ease-standard sm:sticky sm:top-16 sm:flex-row",
+              stuck && "glass",
+            )}
           >
-            <option value="">All tags</option>
-            {tags.data?.map((entry) => (
-              <option key={entry.tag} value={entry.tag}>
-                {entry.tag} ({entry.card_count})
-              </option>
-            ))}
-          </Select>
-        </div>
+            <div className="relative flex-1">
+              <SearchIcon
+                className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
+                aria-hidden
+              />
+              <Input
+                type="search"
+                aria-label="Search cards"
+                placeholder="Search cards"
+                className="pl-9"
+                value={search}
+                onChange={(event) => {
+                  setSearch(event.target.value);
+                }}
+              />
+            </div>
+            <Select
+              aria-label="Filter by tag"
+              className="sm:w-56"
+              value={tag}
+              onChange={(event) => {
+                const value = event.target.value;
+                setParams(
+                  (current) => {
+                    const next = new URLSearchParams(current);
+                    if (value) next.set("tag", value);
+                    else next.delete("tag");
+                    return next;
+                  },
+                  { replace: true },
+                );
+              }}
+            >
+              <option value="">All tags</option>
+              {tags.data?.map((entry) => (
+                <option key={entry.tag} value={entry.tag}>
+                  {entry.tag} ({entry.card_count})
+                </option>
+              ))}
+            </Select>
+          </div>
+        </>
       )}
       {cards.isPending ? (
         <LoadingRows label="Loading cards" />
       ) : cards.isError ? (
         <ErrorState error={cards.error} onRetry={() => void cards.refetch()} />
       ) : allCards.length === 0 && filtered ? (
-        <EmptyState title="No cards match">
+        <EmptyState title="No cards match" icon={SearchXIcon}>
           <p className="text-sm text-muted-foreground">
             Nothing in this deck matches {q ? `"${q}"` : "that"}
             {tag ? ` with the tag ${tag}` : ""}.
@@ -170,11 +225,12 @@ function CardList({ deck }: { deck: Deck }) {
               setParams({}, { replace: true });
             }}
           >
+            <XIcon aria-hidden />
             Clear search
           </Button>
         </EmptyState>
       ) : allCards.length === 0 ? (
-        <EmptyState title="No cards yet">
+        <EmptyState title="No cards yet" icon={GalleryVerticalEndIcon}>
           <p className="text-sm text-muted-foreground">
             {canEdit
               ? "Add one, or import a JSON deck from the menu."
@@ -182,7 +238,10 @@ function CardList({ deck }: { deck: Deck }) {
           </p>
           {canEdit && (
             <Button asChild size="sm">
-              <Link to={`/decks/${deck.id}/cards/new`}>Add card</Link>
+              <Link to={`/decks/${deck.id}/cards/new`}>
+                <PlusIcon aria-hidden />
+                Add card
+              </Link>
             </Button>
           )}
         </EmptyState>
@@ -203,6 +262,7 @@ function CardList({ deck }: { deck: Deck }) {
               disabled={cards.isFetchingNextPage}
               onClick={() => void cards.fetchNextPage()}
             >
+              <ChevronDownIcon aria-hidden />
               {cards.isFetchingNextPage ? "Loading…" : "Show more cards"}
             </Button>
           )}
@@ -284,11 +344,17 @@ export function DeckPage() {
         actions={
           <>
             <Button asChild>
-              <Link to={`/decks/${deckId}/study`}>Study</Link>
+              <Link to={`/decks/${deckId}/study`}>
+                <PlayIcon aria-hidden />
+                Study
+              </Link>
             </Button>
             {canEdit && (
               <Button asChild variant="secondary">
-                <Link to={`/decks/${deckId}/cards/new`}>Add card</Link>
+                <Link to={`/decks/${deckId}/cards/new`}>
+                  <PlusIcon aria-hidden />
+                  Add card
+                </Link>
               </Button>
             )}
             <DropdownMenu>
@@ -300,6 +366,7 @@ export function DeckPage() {
               <DropdownMenuContent align="end">
                 {canEdit && (
                   <DropdownMenuItem disabled={importCards.isPending} onSelect={picker.open}>
+                    <UploadIcon aria-hidden />
                     Import cards from JSON
                   </DropdownMenuItem>
                 )}
@@ -309,6 +376,7 @@ export function DeckPage() {
                     exportDeck.mutate();
                   }}
                 >
+                  <DownloadIcon aria-hidden />
                   Export as JSON
                 </DropdownMenuItem>
                 <DropdownMenuItem
@@ -317,6 +385,7 @@ export function DeckPage() {
                     fork.mutate();
                   }}
                 >
+                  <GitForkIcon aria-hidden />
                   Fork a copy for yourself
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
@@ -325,13 +394,24 @@ export function DeckPage() {
                     setDialog("members");
                   }}
                 >
-                  {role === "owner" ? "Share deck" : "Members"}
+                  {role === "owner" ? (
+                    <>
+                      <UserPlusIcon aria-hidden />
+                      Share deck
+                    </>
+                  ) : (
+                    <>
+                      <UsersIcon aria-hidden />
+                      Members
+                    </>
+                  )}
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   onSelect={() => {
                     setDialog("settings");
                   }}
                 >
+                  <SettingsIcon aria-hidden />
                   Deck settings
                 </DropdownMenuItem>
               </DropdownMenuContent>
