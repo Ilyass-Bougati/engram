@@ -18,6 +18,8 @@ Exported files include quiz answer keys. Anyone who receives one can see the ans
 | Field | Type | Required | Rules |
 |---|---|---|---|
 | `name` | string | yes | 1 to 200 characters. Leading and trailing spaces are trimmed. |
+
+A `::` in the name puts the deck in a collection, as in Anki: `Spanish::Verbs` is listed as "Verbs" inside "Spanish", and collections can nest. Collections exist only through deck names; renaming a deck moves it, and a collection disappears with its last deck.
 | `description` | string | no | Up to 2,000 characters. Defaults to `""`. |
 
 ## Cards

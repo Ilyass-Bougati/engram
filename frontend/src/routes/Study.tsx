@@ -9,6 +9,7 @@ import { ErrorState, FormError } from "@/components/states";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/cn";
+import { deckDisplayName } from "@/lib/collections";
 import { formatRelative, plural, studyCountsText } from "@/lib/format";
 import { isNotFound, useDeck } from "@/lib/queries";
 import type { Deck, QuizResult, StudyCard, StudyNext } from "@/lib/types";
@@ -426,7 +427,7 @@ function StudySession({ deck }: { deck: Deck }) {
           className="inline-flex min-w-0 items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
         >
           <ArrowLeftIcon className="size-4 shrink-0" aria-hidden />
-          <span className="truncate">{deck.name}</span>
+          <span className="truncate">{deckDisplayName(deck.name)}</span>
         </Link>
         {study?.card && counts}
       </header>
@@ -455,7 +456,7 @@ export function StudyPage() {
   const deck = useDeck(deckId);
   return (
     <div className="flex min-h-dvh flex-col">
-      <title>{`Study${deck.data ? ` · ${deck.data.name}` : ""} · Engram`}</title>
+      <title>{`Study${deck.data ? ` · ${deckDisplayName(deck.data.name)}` : ""} · Engram`}</title>
       {deck.isPending ? (
         <p role="status" className="sr-only">
           Loading

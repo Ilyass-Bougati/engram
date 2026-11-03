@@ -17,10 +17,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { api } from "@/lib/api";
+import { deckDisplayName } from "@/lib/collections";
 import { formText } from "@/lib/form";
 import { plural } from "@/lib/format";
 import { invalidateDeck } from "@/lib/queries";
 import type { Deck } from "@/lib/types";
+import { CollectionHint } from "@/routes/decks/CollectionHint";
 
 function DeleteDeck({ deck, onCancel }: { deck: Deck; onCancel: () => void }) {
   const queryClient = useQueryClient();
@@ -36,7 +38,7 @@ function DeleteDeck({ deck, onCancel }: { deck: Deck; onCancel: () => void }) {
   return (
     <>
       <DialogHeader>
-        <DialogTitle>Delete "{deck.name}"?</DialogTitle>
+        <DialogTitle>Delete "{deckDisplayName(deck.name)}"?</DialogTitle>
         <DialogDescription>
           This deletes {plural(deck.card_count, "card")} and everyone's review history for them.
           Members lose access right away. It can't be undone.
@@ -118,7 +120,9 @@ function SettingsForm({ deck, onDelete }: { deck: Deck; onDelete: () => void }) 
                   defaultValue={deck.name}
                   required
                   maxLength={200}
+                  aria-describedby="settings-name-hint"
                 />
+                <CollectionHint id="settings-name-hint" />
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="settings-description">Description</Label>

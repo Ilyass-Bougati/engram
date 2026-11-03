@@ -17,6 +17,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { api } from "@/lib/api";
+import { deckDisplayName } from "@/lib/collections";
 import { plural } from "@/lib/format";
 import type { AnkiImportResult } from "@/lib/types";
 
@@ -24,7 +25,8 @@ function ImportSummary({ result }: { result: AnkiImportResult }) {
   return (
     <div className="grid gap-2 text-sm" role="status">
       <p className="text-base">
-        Imported {plural(result.imported, "card")} into <strong>{result.deck.name}</strong>.
+        Imported {plural(result.imported, "card")} into{" "}
+        <strong>{deckDisplayName(result.deck.name)}</strong>.
       </p>
       <ul className="grid list-disc gap-1 pl-5 text-muted-foreground">
         {result.reviews_imported > 0 && (

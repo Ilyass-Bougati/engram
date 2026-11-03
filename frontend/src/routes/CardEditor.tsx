@@ -22,6 +22,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { api, UserFacingError } from "@/lib/api";
+import { deckDisplayName } from "@/lib/collections";
 import { parseTags } from "@/lib/form";
 import { invalidateDeck, isNotFound, useDeck } from "@/lib/queries";
 import type { Card, CardData, Deck } from "@/lib/types";
@@ -588,7 +589,7 @@ export function CardEditorPage() {
 
   return (
     <div className="grid gap-8">
-      <title>{`${title} · ${deck.data.name} · Engram`}</title>
+      <title>{`${title} · ${deckDisplayName(deck.data.name)} · Engram`}</title>
       <div className="grid gap-3">
         {backLink}
         <h1 className="text-2xl font-semibold sm:text-3xl">{title}</h1>

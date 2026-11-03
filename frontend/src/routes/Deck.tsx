@@ -24,6 +24,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { api } from "@/lib/api";
+import { deckDisplayName, deckPath } from "@/lib/collections";
 import { downloadFromApi } from "@/lib/download";
 import { readJsonFile } from "@/lib/form";
 import { firstLine, plural, studyCountsText } from "@/lib/format";
@@ -255,15 +256,17 @@ export function DeckPage() {
   }
 
   const { role } = deck.data;
+  const path = deckPath(deck.data.name);
   const canEdit = role !== "viewer";
   const actionError = importCards.error ?? fork.error ?? exportDeck.error;
 
   return (
     <div className="grid gap-8">
-      <title>{`${deck.data.name} · Engram`}</title>
+      <title>{`${deckDisplayName(deck.data.name)} · Engram`}</title>
       {picker.input}
       <PageHeader
-        title={deck.data.name}
+        title={path.at(-1) ?? deck.data.name}
+        eyebrow={path.length > 1 ? path.slice(0, -1).join(" / ") : undefined}
         description={
           <>
             {deck.data.description && (

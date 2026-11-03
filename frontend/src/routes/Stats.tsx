@@ -6,6 +6,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { EmptyState, ErrorState, LoadingRows } from "@/components/states";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
+import { deckDisplayName } from "@/lib/collections";
 import { plural } from "@/lib/format";
 import type { Stats } from "@/lib/types";
 import { ActivityHeatmap } from "@/routes/stats/ActivityHeatmap";
@@ -66,7 +67,7 @@ function DeckTable({ decks }: { decks: Stats["decks"] }) {
             <tr key={deck.deck_id} className="border-b border-border last:border-0">
               <td className="grid gap-1.5 py-2.5 pr-3">
                 <Link to={`/decks/${deck.deck_id}`} className="font-medium hover:underline">
-                  {deck.name}
+                  {deckDisplayName(deck.name)}
                 </Link>
                 <CardStatesBar states={deck.states} compact />
               </td>

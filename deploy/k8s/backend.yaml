@@ -47,7 +47,7 @@ spec:
           type: RuntimeDefault
       initContainers:
         - name: wait-for-migrations
-          image: ghcr.io/l03x/engram-backend
+          image: ghcr.io/l03x/engram-backend:latest
           imagePullPolicy: IfNotPresent
           command: ["python", "-m", "app.cli", "wait-for-migrations", "--timeout", "600"]
           env: &env

@@ -20,4 +20,4 @@ labels:
 
 images:
   - name: ghcr.io/l03x/engram-backend
-    newTag: 0.1.0
+    newTag: 0.1.1

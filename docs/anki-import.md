@@ -12,7 +12,7 @@ The import always creates a new deck that you own. Nothing is added to an existi
 - **Math:** MathJax `\(...\)` and `\[...\]`, and `[latex]...[/latex]`, become `$...$` and `$$...$$`.
 - **Images, sounds and video are left out.** The result says how many were removed. A card that is empty without its media is skipped.
 - **Tags** are lowercased. Tags Engram doesn't allow (see [tags](deck-format.md#tags)) are dropped, as are any past the 20th.
-- **Subdecks:** the deck is named after the subdecks' common parent. Cards from several subdecks get the subdeck path as a tag, for example `europe::capitals` for `Geography::Europe::Capitals`. Cards from Anki's "Default" deck take the file's name instead. You can rename the deck afterwards.
+- **Subdecks:** the deck is named after the subdecks' common parent. Cards from several subdecks get the subdeck path as a tag, for example `europe::capitals` for `Geography::Europe::Capitals`. Cards from Anki's "Default" deck take the file's name instead. You can rename the deck afterwards. A deck named like `OCP Java 17::Day 1` shows up inside an "OCP Java 17" collection, so subdecks exported one at a time end up together again.
 - **Skipped cards:** a card is skipped if either side is empty or longer than 20,000 characters.
 
 ## Keeping your Anki progress

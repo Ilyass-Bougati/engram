@@ -64,6 +64,14 @@ const EMPTY_DECK = {
   cards: [],
 };
 
+// Two decks in one collection, named the way Anki imports come in.
+const SPANISH = ["Verbs", "Food and drink"].map((name) => ({
+  format: "engram-deck",
+  version: 1,
+  deck: { name: `Spanish::${name}` },
+  cards: [{ type: "basic", front: `A ${name.toLowerCase()} word`, back: "Una palabra" }],
+}));
+
 // Client-side navigation: a full page load would spend a refresh-token rotation (rate
 // limited per IP) on every screenshot.
 async function go(page: Page, path: string): Promise<void> {
@@ -102,6 +110,7 @@ test("screenshots of every screen", async ({ browser, page, apiAs }) => {
   const algebra = await importDeck(api, EXAMPLE_DECK);
   const geography = await importDeck(api, GEOGRAPHY);
   const empty = await importDeck(api, EMPTY_DECK);
+  const [verbs] = await Promise.all(SPANISH.map((deck) => importDeck(api, deck)));
   for (const [user, role] of [
     [users.friend, "viewer"],
     [users.reader, "editor"],
@@ -147,7 +156,15 @@ test("screenshots of every screen", async ({ browser, page, apiAs }) => {
     await expect(
       page.getByRole("link", { name: "Linear algebra basics", exact: true }),
     ).toBeVisible();
+    // Open state is remembered, so only the first variant has to open the collection.
+    const spanish = page.getByRole("button", { name: /^Spanish/ });
+    if ((await spanish.getAttribute("aria-expanded")) === "false") await spanish.click();
+    await expect(page.getByRole("link", { name: "Verbs", exact: true })).toBeVisible();
     await capture(page, "decks", variant);
+
+    await go(page, `/decks/${verbs?.id ?? ""}`);
+    await expect(page.getByRole("heading", { name: "Verbs" })).toBeVisible();
+    await capture(page, "deck-in-collection", variant);
 
     await go(page, `/decks/${algebra.id}`);
     await expect(page.getByRole("heading", { name: "Linear algebra basics" })).toBeVisible();
