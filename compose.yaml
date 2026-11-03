@@ -1,8 +1,24 @@
 name: engram
 
+# Single-machine deployment: Postgres, the one-shot migration, and the API. Serving the web
+# app at the same origin as /api is not part of this file yet (see README.md).
+
+x-backend: &backend
+  build: ./backend
+  image: ghcr.io/l03x/engram-backend:0.1.0
+  environment:
+    DATABASE_URL: postgresql://engram:${POSTGRES_PASSWORD}@db:5432/engram
+    JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env (see .env.example)}
+  # Nothing in the image writes to disk at runtime.
+  read_only: true
+  tmpfs: [/tmp]
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+
 services:
   db:
     image: postgres:16-alpine
+    restart: unless-stopped
     environment:
       POSTGRES_USER: engram
       POSTGRES_DB: engram
@@ -10,6 +26,7 @@ services:
     command: ["postgres", "-c", "shared_buffers=128MB", "-c", "max_connections=30"]
     volumes:
       - pgdata:/var/lib/postgresql/data
+    security_opt: ["no-new-privileges:true"]
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U engram -d engram"]
       interval: 5s
@@ -17,25 +34,20 @@ services:
       retries: 10
 
   migrate:
-    build: ./backend
-    image: engram-backend
+    <<: *backend
     command: ["alembic", "upgrade", "head"]
-    environment: &backend-env
-      DATABASE_URL: postgresql://engram:${POSTGRES_PASSWORD}@db:5432/engram
-      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env (see .env.example)}
     depends_on:
       db:
         condition: service_healthy
 
   backend:
-    build: ./backend
-    image: engram-backend
-    environment: *backend-env
+    <<: *backend
+    restart: unless-stopped
     depends_on:
       migrate:
         condition: service_completed_successfully
-    # Direct API access on the host. The app itself is served by the frontend on 6969,
-    # which proxies /api here, so browsers only ever see one origin.
+    # Published on the host's loopback only. In development the Vite server on 6969 proxies
+    # /api here, so the browser sees one origin.
     ports:
       - "127.0.0.1:6767:8000"
     healthcheck:

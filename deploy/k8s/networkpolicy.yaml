@@ -1,0 +1,44 @@
+# Nothing reaches a pod in this namespace unless a policy below allows it. k3s enforces
+# NetworkPolicy out of the box.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-ingress
+spec:
+  podSelector: {}
+  policyTypes: [Ingress]
+---
+# Postgres takes connections only from the backend and the migration Job.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: postgres
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: postgres
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              engram/db-client: "true"
+      ports:
+        - port: 5432
+---
+# The API takes connections from pods in this namespace. If whatever serves the app (or
+# cloudflared) runs in another namespace, add a namespaceSelector entry for it here.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: backend
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: backend
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector: {}
+      ports:
+        - port: 8000

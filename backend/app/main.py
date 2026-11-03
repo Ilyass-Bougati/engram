@@ -9,7 +9,7 @@ from app.deps import PUBLIC
 from app.models import CardKind
 from app.routers import admin, auth, cards, decks, invites, me, members, reviews
 
-# Deck imports are the largest legitimate bodies; nginx enforces the same cap in front.
+# Deck imports are the largest legitimate bodies. A proxy in front may cap lower, never higher.
 MAX_BODY_BYTES = 2 * 1024 * 1024
 
 

@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: engram
+  labels:
+    # Every pod here runs non-root, drops all capabilities and uses the runtime's seccomp
+    # profile, so the strictest Pod Security level is enforced.
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/enforce-version: latest

@@ -51,7 +51,8 @@ class RateLimiter:
 
 
 def client_ip(request: Request) -> str:
-    # uvicorn runs with --proxy-headers, so this is the address nginx forwarded.
+    # With --proxy-headers this is the X-Forwarded-For address, but only when the request came
+    # from an address in FORWARDED_ALLOW_IPS; otherwise it's the TCP peer.
     return request.client.host if request.client else "unknown"
 
 

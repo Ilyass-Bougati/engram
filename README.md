@@ -2,9 +2,17 @@
 
 A self-hosted spaced-repetition flashcard app for a small group of people. Accounts are invite-only.
 
-Status: Phase 3 of 6. The backend is complete (accounts, decks, sharing, import/export, reviews with FSRS scheduling); the web client comes next. See `PLAN.md`.
+This file covers deployment only. Everything else is in [`docs/`](docs):
 
-## Run it with Docker Compose
+- [Configuration](docs/configuration.md): environment variables
+- [Admin CLI](docs/admin-cli.md): creating admins, resetting passwords
+- [Deck format](docs/deck-format.md): the JSON import/export format
+- [Security](docs/security.md): sessions, rate limits, access rules, proxies
+- [Development](docs/development.md): running the checks and the end-to-end tests
+
+> **Not covered yet: serving the web app.** These files deploy the API (`/api`) and its database. They don't build or serve the frontend. Whatever serves it later must put the page and `/api` on **one origin**, because the refresh cookie and the CSRF header depend on it. Until then the frontend runs only in development (`npm run dev` in `frontend/`, on port 6969).
+
+## Option 1: Docker Compose on one machine
 
 Requirements: Docker with Compose v2.
 
@@ -13,75 +21,167 @@ cp .env.example .env
 sed -i "s/^POSTGRES_PASSWORD=.*/POSTGRES_PASSWORD=$(openssl rand -hex 32)/; s/^JWT_SECRET=.*/JWT_SECRET=$(openssl rand -hex 32)/" .env
 docker compose up -d --build --wait
 docker compose exec backend python -m app.cli create-admin <your-username>
+curl -fsS http://127.0.0.1:6767/api/health/ready
 ```
-
-Compose starts three services:
 
 | Service | What it does |
 |---|---|
 | `db` | Postgres 16. Data lives in the named volume `engram_pgdata`. |
 | `migrate` | Runs `alembic upgrade head` once, then exits. |
-| `backend` | The API. It starts only after `migrate` succeeds. |
+| `backend` | The API, published on `127.0.0.1:6767` only. It starts after `migrate` succeeds. |
 
-The API is published at `http://127.0.0.1:6767/api`. From Phase 4 on, the app is served at `http://localhost:6969`, with nginx proxying `/api` to the backend.
+To upgrade, pull the new code and run `docker compose up -d --build --wait` again. Migrations run first.
 
-## Environment variables
+## Option 2: k3s behind a Cloudflare Tunnel
 
-Config comes only from the environment. The backend exits at startup if a required value is missing or invalid. There are no fallback secrets.
+The manifests in [`deploy/k8s/`](deploy/k8s) are plain kustomize. They contain no Ingress: cloudflared reaches the Services directly.
 
-| Variable | Required | Meaning |
+| Object | Kind | Notes |
 |---|---|---|
-| `DATABASE_URL` | yes | Postgres URL. `postgresql://…` is accepted and pinned to the psycopg driver. |
-| `JWT_SECRET` | yes | Signs access tokens. At least 32 characters; use `openssl rand -hex 32`. |
-| `REFRESH_TOKEN_DAYS` | no (default 30) | Lifetime of a refresh token. Each refresh rotates it. |
-| `POSTGRES_PASSWORD` | compose only | Password for the bundled Postgres. Compose builds `DATABASE_URL` from it. |
+| `engram` | Namespace | Pod Security `restricted` enforced |
+| `postgres` | StatefulSet + headless Service | 5 Gi PVC on `local-path` |
+| `engram-migrate` | Job | `alembic upgrade head`, removed 10 minutes after it finishes |
+| `backend` | Deployment + ClusterIP Service on port 8000 | 1 replica. An initContainer waits until the schema matches the image. |
+| `default-deny-ingress`, `postgres`, `backend` | NetworkPolicy | Postgres accepts the backend and the Job only. The API accepts pods in the namespace only. |
 
-## Admin CLI
+Every pod runs as non-root with a read-only root filesystem, no capabilities, the runtime's seccomp profile and no service account token.
 
-Run inside the backend container (`docker compose exec backend …`), or from `backend/` with `uv run`.
+### Resources (sized for a 4 GB node shared with other workloads)
 
-| Command | What it does |
-|---|---|
-| `python -m app.cli create-admin <username>` | Creates an admin. Prompts for the password twice. |
-| `python -m app.cli set-password <username>` | Sets a new password and signs out all of that user's sessions. This is the recovery path for a forgotten password, since the app sends no email. |
-| `python -m app.cli wait-for-migrations [--timeout 300]` | Blocks until the database schema matches the code. Used by the k8s initContainer. |
+| Workload | Memory request / limit | CPU request / limit |
+|---|---|---|
+| Postgres (`shared_buffers=128MB`, `max_connections=30`) | 256Mi / 512Mi | 100m / 1 |
+| Backend (1 uvicorn worker) | 160Mi / 384Mi | 50m / 1 |
+| Migration Job (only while it runs) | 128Mi / 256Mi | 50m / 500m |
 
-`create-admin` and `set-password` accept `--password-stdin`, which reads the password from the first line of stdin.
+In steady state Engram requests 416Mi and is capped at 896Mi.
 
-Admins invite people from the app. An invite link is single-use and expires after 7 days.
+### 1. Build and push the image
 
-## Decks and sharing
-
-Each deck has one owner, who can share it by username as `editor` (may edit cards) or `viewer` (study only). The owner can change or revoke a member's role, and any member can leave a deck.
-
-- **Hidden decks:** someone who isn't a member gets `404` for a deck and everything in it, so they can't tell it exists.
-- **Hidden answer keys:** viewers browsing a deck don't see which quiz options are correct, or the explanation. Exports and forks do include the answer key, and any member can export or fork.
-- **Forks:** a fork is an independent copy owned by whoever forked it. It has no link back to the original, and no review progress carries over.
-- **Import/export:** the JSON deck format is documented in [`docs/deck-format.md`](docs/deck-format.md), with an example in [`docs/example-deck.json`](docs/example-deck.json). Imports are capped at 2 MiB and 5,000 cards.
-
-## How sessions work
-
-- **Login** returns a 15-minute access token. It also sets an httpOnly, Secure, SameSite=Lax refresh cookie scoped to `/api/auth`.
-- **Refresh tokens rotate** on every use. Presenting one that was already used revokes that login's whole token chain.
-- **Logout, password change and deactivation** revoke refresh tokens. Password change and deactivation also invalidate live access tokens at once.
-- **`POST /api/auth/refresh` and `/api/auth/logout`** require the header `X-Engram-CSRF: 1`.
-- **Rate limits:**
-  - login: 10 per minute per IP, and 5 failed attempts per 15 minutes per username
-  - refresh: 30 per minute per IP
-  - invite lookup and redemption: 10 per minute per IP
-- **One process only.** The limiter keeps its counters in memory, so the backend must run as one process (one uvicorn worker, one replica).
-
-## Development
-
-Requirements: [uv](https://docs.astral.sh/uv/) and Docker (the tests start a throwaway Postgres 16 container).
+The usual way is to let GitHub do it. Set `version` in `backend/pyproject.toml`, commit, then push a matching tag:
 
 ```bash
-cd backend
-uv sync
-uv run ruff check
-uv run ruff format --check
-uv run mypy --strict app tests migrations
-uv run pytest
+git tag v0.1.0
+git push origin v0.1.0
 ```
 
-The tests run against a real Postgres started by testcontainers, migrated with Alembic. Nothing is mocked or run on SQLite.
+The [release workflow](.github/workflows/release.yml) then:
+
+1. Runs the backend and frontend checks.
+2. Builds the image for amd64 and arm64.
+3. Pushes it as `ghcr.io/l03x/engram-backend:0.1.0`.
+
+It fails if the tag and the pyproject version disagree. It doesn't touch the cluster.
+
+To build by hand instead, run this on any machine with Docker, logged in to GHCR with a token that has `write:packages`:
+
+```bash
+docker login ghcr.io -u l03x
+docker build -t ghcr.io/l03x/engram-backend:0.1.0 backend
+docker push ghcr.io/l03x/engram-backend:0.1.0
+```
+
+If the server's CPU architecture differs from the build machine (an arm64 server, say), build for it instead:
+
+```bash
+docker buildx build --platform linux/arm64 -t ghcr.io/l03x/engram-backend:0.1.0 --push backend
+```
+
+The tag the cluster runs is set in `deploy/k8s/kustomization.yaml` under `images`.
+
+### 2. Let the cluster pull the image
+
+GHCR packages start out private. Either make `engram-backend` public (on GitHub: the package → Package settings → Change visibility), or give the namespace a pull secret. For the pull secret, create the namespace first, then use a token that has `read:packages` only:
+
+```bash
+kubectl apply -f deploy/k8s/namespace.yaml
+read -rs GHCR_TOKEN
+kubectl -n engram create secret docker-registry ghcr --docker-server=ghcr.io --docker-username=l03x --docker-password="$GHCR_TOKEN"
+kubectl -n engram patch serviceaccount default -p '{"imagePullSecrets":[{"name":"ghcr"}]}'
+```
+
+### 3. Create the secret
+
+```bash
+kubectl apply -f deploy/k8s/namespace.yaml
+cp deploy/k8s/secret.example.yaml deploy/k8s/secret.yaml
+sed -i "s/POSTGRES_PASSWORD: \"\"/POSTGRES_PASSWORD: \"$(openssl rand -hex 32)\"/; s/JWT_SECRET: \"\"/JWT_SECRET: \"$(openssl rand -hex 32)\"/" deploy/k8s/secret.yaml
+kubectl apply -f deploy/k8s/secret.yaml
+```
+
+`deploy/k8s/secret.yaml` is gitignored. Keep a copy somewhere safe, such as a password manager: the database password in it can't be recovered from the cluster once the PVC is the only thing left.
+
+### 4. Deploy
+
+```bash
+kubectl apply -k deploy/k8s
+kubectl -n engram wait --for=condition=complete job/engram-migrate --timeout=5m
+kubectl -n engram rollout status deploy/backend --timeout=5m
+```
+
+On a fresh install the Job may fail once or twice while Postgres initializes. It retries on its own.
+
+### 5. Create the first admin
+
+```bash
+kubectl -n engram exec -it deploy/backend -- python -m app.cli create-admin <your-username>
+```
+
+The admin then invites everyone else from the app.
+
+### 6. Check the API
+
+```bash
+kubectl -n engram port-forward svc/backend 6767:8000
+```
+
+Then, in another terminal:
+
+```bash
+curl -fsS http://127.0.0.1:6767/api/health/ready
+```
+
+### 7. Point the tunnel at it
+
+The API's in-cluster address is `http://backend.engram.svc.cluster.local:8000`. Once something serves the web app, give the tunnel one public hostname that sends `/api/` to the backend and everything else to the web server. cloudflared's ingress rules can split by path:
+
+```yaml
+ingress:
+  - hostname: engram.example.com
+    path: ^/api/
+    service: http://backend.engram.svc.cluster.local:8000
+  - hostname: engram.example.com
+    service: http://<your web server>
+  - service: http_status:404
+```
+
+Two things depend on where cloudflared runs:
+
+- **The NetworkPolicy.** The `backend` policy admits pods in the `engram` namespace only. If cloudflared runs in another namespace, add a `namespaceSelector` for it to [`networkpolicy.yaml`](deploy/k8s/networkpolicy.yaml).
+- **Client IPs.** The rate limiter sees cloudflared's address, not the visitor's, until the backend is told to trust it. See `FORWARDED_ALLOW_IPS` in [configuration](docs/configuration.md).
+
+### Upgrading
+
+Release the new version (step 1), wait for the workflow to finish, then set the new tag under `images` in `kustomization.yaml`. A Job can't be changed in place, so delete the finished one before applying:
+
+```bash
+kubectl -n engram delete job engram-migrate --ignore-not-found
+kubectl apply -k deploy/k8s
+kubectl -n engram rollout status deploy/backend --timeout=5m
+```
+
+The new backend pod waits until the Job has migrated the schema. The Deployment uses `Recreate`, so the API is down for a few seconds during the switch.
+
+### Backups
+
+```bash
+kubectl -n engram exec postgres-0 -- pg_dump -U engram -d engram --format=custom > engram-$(date +%F).dump
+```
+
+To restore into an empty database:
+
+```bash
+kubectl -n engram exec -i postgres-0 -- pg_restore -U engram -d engram --clean --if-exists < engram-YYYY-MM-DD.dump
+```
+
+The data itself lives under k3s's local-path directory on the node (`/var/lib/rancher/k3s/storage` by default). Deleting the namespace deletes the PVC and that data with it.
