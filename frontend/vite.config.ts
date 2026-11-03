@@ -13,7 +13,8 @@ export default defineConfig({
     port: 6969,
     strictPort: true,
     // Same origin in development too: the browser only talks to Vite, which forwards /api.
-    proxy: { "/api": "http://127.0.0.1:6767" },
+    // The end-to-end tests point ENGRAM_API_URL at their own throwaway backend.
+    proxy: { "/api": process.env.ENGRAM_API_URL ?? "http://127.0.0.1:6767" },
   },
   test: {
     include: ["src/**/*.test.{ts,tsx}"],

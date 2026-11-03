@@ -9,7 +9,8 @@ export default defineConfig(
   js.configs.recommended,
   tseslint.configs.strictTypeChecked,
   tseslint.configs.stylisticTypeChecked,
-  reactHooks.configs.flat.recommended,
+  // React code only: Playwright fixtures also call a function named `use`.
+  { files: ["src/**/*.{ts,tsx}"], extends: [reactHooks.configs.flat.recommended] },
   {
     languageOptions: {
       globals: globals.browser,

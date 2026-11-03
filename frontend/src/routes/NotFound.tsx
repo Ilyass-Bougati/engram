@@ -1,10 +1,12 @@
 import { Link } from "react-router";
 
+import { CenteredPage } from "@/components/CenteredPage";
 import { Button } from "@/components/ui/button";
 
 export function NotFound() {
   return (
-    <div className="mx-auto flex min-h-dvh max-w-md flex-col justify-center gap-6 px-4">
+    <CenteredPage>
+      <title>Page not found · Engram</title>
       <div className="grid gap-2">
         <h1 className="text-2xl font-semibold">Page not found</h1>
         <p className="text-muted-foreground">
@@ -14,6 +16,6 @@ export function NotFound() {
       <Button asChild className="self-start">
         <Link to="/">Go to your decks</Link>
       </Button>
-    </div>
+    </CenteredPage>
   );
 }

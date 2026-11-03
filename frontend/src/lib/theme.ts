@@ -1,6 +1,12 @@
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 
 export type ThemePreference = "light" | "dark" | "system";
+
+export const THEME_OPTIONS: { value: ThemePreference; label: string }[] = [
+  { value: "system", label: "Match system" },
+  { value: "light", label: "Light" },
+  { value: "dark", label: "Dark" },
+];
 
 const STORAGE_KEY = "engram-theme";
 
@@ -27,15 +33,27 @@ export function applyThemePreference(preference: ThemePreference): void {
   }
 }
 
+// One shared value, so the user menu and the settings page stay in step.
+let current = storedThemePreference();
+const listeners = new Set<() => void>();
+
+function setThemePreference(next: ThemePreference): void {
+  current = next;
+  applyThemePreference(next);
+  try {
+    localStorage.setItem(STORAGE_KEY, next);
+  } catch {
+    // Not persisted this time; the choice still applies until the page reloads.
+  }
+  for (const listener of listeners) listener();
+}
+
+function subscribe(listener: () => void): () => void {
+  listeners.add(listener);
+  return () => listeners.delete(listener);
+}
+
 export function useThemePreference(): [ThemePreference, (next: ThemePreference) => void] {
-  const [preference, setPreference] = useState(storedThemePreference);
-  useEffect(() => {
-    applyThemePreference(preference);
-    try {
-      localStorage.setItem(STORAGE_KEY, preference);
-    } catch {
-      // Not persisted this time; the choice still applies until the page reloads.
-    }
-  }, [preference]);
-  return [preference, setPreference];
+  const preference = useSyncExternalStore(subscribe, () => current);
+  return [preference, setThemePreference];
 }

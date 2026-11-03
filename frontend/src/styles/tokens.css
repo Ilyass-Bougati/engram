@@ -43,6 +43,25 @@
   --glass-blur: 24px;
   --scrim: light-dark(rgb(28 27 25 / 0.32), rgb(0 0 0 / 0.56));
 
+  /*
+   * Code highlighting (Shiki's CSS-variables theme). Aliases of text colors tested above, so
+   * code on a solid surface meets AA in both themes without its own palette.
+   */
+  --code-foreground: var(--ink);
+  --code-background: var(--surface);
+  --code-token-comment: var(--ink-muted);
+  --code-token-punctuation: var(--ink-muted);
+  --code-token-keyword: var(--rating-again);
+  --code-token-function: var(--rating-hard);
+  --code-token-string: var(--rating-good);
+  --code-token-string-expression: var(--rating-good);
+  --code-token-link: var(--rating-good);
+  --code-token-constant: var(--rating-easy);
+  --code-token-parameter: var(--ink);
+  --code-token-inserted: var(--rating-good);
+  --code-token-deleted: var(--danger);
+  --code-token-changed: var(--rating-hard);
+
   /* Motion: deceleration only, no overshoot. */
   --duration-fast: 120ms;
   --duration-base: 200ms;

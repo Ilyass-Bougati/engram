@@ -1,6 +1,6 @@
 import { ChevronDownIcon, LogOutIcon, SettingsIcon } from "lucide-react";
 import type { ReactNode } from "react";
-import { Link, NavLink } from "react-router";
+import { Link, NavLink, useLocation } from "react-router";
 
 import {
   DropdownMenu,
@@ -13,7 +13,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/cn";
-import { useThemePreference, type ThemePreference } from "@/lib/theme";
+import { THEME_OPTIONS, useThemePreference } from "@/lib/theme";
 
 interface AppShellProps {
   username: string;
@@ -21,12 +21,6 @@ interface AppShellProps {
   onSignOut: () => void;
   children: ReactNode;
 }
-
-const THEMES: { value: ThemePreference; label: string }[] = [
-  { value: "system", label: "Match system" },
-  { value: "light", label: "Light" },
-  { value: "dark", label: "Dark" },
-];
 
 function navLinkClass({ isActive }: { isActive: boolean }): string {
   return cn(
@@ -36,6 +30,8 @@ function navLinkClass({ isActive }: { isActive: boolean }): string {
 }
 
 export function AppShell({ username, isAdmin, onSignOut, children }: AppShellProps) {
+  const { pathname } = useLocation();
+  const onDecks = pathname === "/" || pathname.startsWith("/decks/");
   const [theme, setTheme] = useThemePreference();
 
   return (
@@ -54,7 +50,11 @@ export function AppShell({ username, isAdmin, onSignOut, children }: AppShellPro
           <nav aria-label="Main">
             <ul className="flex items-center gap-1">
               <li>
-                <NavLink to="/" end className={navLinkClass}>
+                <NavLink
+                  to="/"
+                  className={() => navLinkClass({ isActive: onDecks })}
+                  aria-current={onDecks ? "page" : undefined}
+                >
                   Decks
                 </NavLink>
               </li>
@@ -77,11 +77,11 @@ export function AppShell({ username, isAdmin, onSignOut, children }: AppShellPro
               <DropdownMenuRadioGroup
                 value={theme}
                 onValueChange={(value) => {
-                  const choice = THEMES.find((option) => option.value === value);
+                  const choice = THEME_OPTIONS.find((option) => option.value === value);
                   if (choice) setTheme(choice.value);
                 }}
               >
-                {THEMES.map((option) => (
+                {THEME_OPTIONS.map((option) => (
                   <DropdownMenuRadioItem key={option.value} value={option.value}>
                     {option.label}
                   </DropdownMenuRadioItem>

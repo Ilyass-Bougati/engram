@@ -1,0 +1,6 @@
+# Layered over ../compose.yaml under the project name engram-e2e: its own database volume and
+# a different host port, so test runs never touch a running engram stack.
+services:
+  backend:
+    ports: !override
+      - "127.0.0.1:6768:8000"

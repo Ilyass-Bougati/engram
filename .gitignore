@@ -11,4 +11,5 @@ dist/
 frontend/test-results/
 frontend/playwright-report/
 frontend/screenshots/
+frontend/e2e/.stack.json
 PLAN.md
