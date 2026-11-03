@@ -1,0 +1,13 @@
+.env
+deploy/k8s/secret.yaml
+__pycache__/
+*.pyc
+.venv/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+node_modules/
+dist/
+frontend/test-results/
+frontend/playwright-report/
+PLAN.md

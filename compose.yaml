@@ -1,0 +1,51 @@
+name: engram
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: engram
+      POSTGRES_DB: engram
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env (see .env.example)}
+    command: ["postgres", "-c", "shared_buffers=128MB", "-c", "max_connections=30"]
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U engram -d engram"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  migrate:
+    build: ./backend
+    image: engram-backend
+    command: ["alembic", "upgrade", "head"]
+    environment: &backend-env
+      DATABASE_URL: postgresql://engram:${POSTGRES_PASSWORD}@db:5432/engram
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env (see .env.example)}
+    depends_on:
+      db:
+        condition: service_healthy
+
+  backend:
+    build: ./backend
+    image: engram-backend
+    environment: *backend-env
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    # Published only until the nginx frontend (Phase 4) takes over as the single origin.
+    ports:
+      - "127.0.0.1:6767:8000"
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health/ready')"
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  pgdata:
