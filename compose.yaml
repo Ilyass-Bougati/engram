@@ -1,11 +1,11 @@
 name: engram
 
-# Single-machine deployment: Postgres, the one-shot migration, and the API. Serving the web
-# app at the same origin as /api is not part of this file yet (see README.md).
+# Single-machine deployment: Postgres, the one-shot migration, and the app (the API and the
+# web app it serves, on one origin).
 
 x-backend: &backend
-  build: ./backend
-  image: ghcr.io/l03x/engram-backend:0.1.1
+  build: .
+  image: ghcr.io/l03x/engram:0.2.0
   environment:
     DATABASE_URL: postgresql://engram:${POSTGRES_PASSWORD}@db:5432/engram
     JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env (see .env.example)}
@@ -46,8 +46,8 @@ services:
     depends_on:
       migrate:
         condition: service_completed_successfully
-    # Published on the host's loopback only. In development the Vite server on 6969 proxies
-    # /api here, so the browser sees one origin.
+    # Published on the host's loopback only: the app is at http://127.0.0.1:6767. In
+    # development the Vite server on 6969 proxies /api here instead.
     ports:
       - "127.0.0.1:6767:8000"
     healthcheck:

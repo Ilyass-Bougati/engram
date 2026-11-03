@@ -19,5 +19,5 @@ labels:
     includeTemplates: true
 
 images:
-  - name: ghcr.io/l03x/engram-backend
-    newTag: 0.1.1
+  - name: ghcr.io/l03x/engram
+    newTag: 0.2.0

@@ -9,6 +9,7 @@ from app.deps import PUBLIC
 from app.models import CardKind
 from app.routers import admin, auth, cards, decks, invites, me, members, reviews
 from app.routers.decks import ANKI_IMPORT_PATH, MAX_ANKI_UPLOAD_BYTES
+from app.web import SecurityHeaders, web_mount
 
 # JSON deck imports are the largest ordinary bodies. A proxy in front may cap lower, never higher.
 MAX_BODY_BYTES = 2 * 1024 * 1024
@@ -74,6 +75,7 @@ def _field_path(location: tuple[int | str, ...]) -> str:
 # every route.
 app = FastAPI(title="Engram", docs_url=None, redoc_url=None, openapi_url=None)
 app.add_middleware(BodySizeLimit)
+app.add_middleware(SecurityHeaders)
 
 
 @app.exception_handler(RequestValidationError)
@@ -114,3 +116,8 @@ for module in (auth, invites, me, admin, decks, members, cards, reviews):
     api.include_router(module.router)
 
 app.include_router(api)
+
+# The web app goes last, behind every API route. Without a build (development, tests) it's
+# left out and only the API runs.
+if (web := web_mount()) is not None:
+    app.router.routes.append(web)

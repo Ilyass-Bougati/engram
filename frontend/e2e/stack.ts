@@ -2,7 +2,9 @@ import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 
-export const APP_URL = "http://localhost:6970";
+// The throwaway stack's app: the built web app and the API on one origin, as deployed. The
+// browser uses localhost (the refresh cookie is set for it); API set-up calls go direct.
+export const APP_URL = "http://localhost:6768";
 export const BACKEND_URL = "http://127.0.0.1:6768";
 export const STACK_FILE = path.join(import.meta.dirname, ".stack.json");
 

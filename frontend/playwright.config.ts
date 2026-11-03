@@ -19,17 +19,10 @@ export default defineConfig({
     { name: "app", testMatch: "app/*.spec.ts", dependencies: ["stack"] },
     { name: "screens", testMatch: "screens.spec.ts", dependencies: ["stack"] },
   ],
-  webServer: [
-    {
-      command: "npm run dev",
-      url: "http://localhost:6969/specimen.html",
-      reuseExistingServer: true,
-    },
-    {
-      // Its own dev server, proxying to the throwaway backend that e2e/stack.setup.ts starts.
-      command: "npx vite --port 6970 --strictPort",
-      url: APP_URL,
-      env: { ENGRAM_API_URL: "http://127.0.0.1:6768" },
-    },
-  ],
+  // Only the design specimen needs Vite; the app specs use the stack's built app.
+  webServer: {
+    command: "npm run dev",
+    url: "http://localhost:6969/specimen.html",
+    reuseExistingServer: true,
+  },
 });

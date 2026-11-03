@@ -1,0 +1,18 @@
+# An allowlist: the image is built from these paths only. Everything else stays out of the
+# build context, secrets above all (.env, deploy/k8s/secret.yaml, frontend/.env.local,
+# frontend/e2e/.stack.json).
+*
+!backend/pyproject.toml
+!backend/uv.lock
+!backend/.python-version
+!backend/alembic.ini
+!backend/migrations
+!backend/app
+!frontend/package.json
+!frontend/package-lock.json
+!frontend/index.html
+!frontend/vite.config.ts
+!frontend/tsconfig.json
+!frontend/public
+!frontend/src
+**/__pycache__

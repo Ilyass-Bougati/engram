@@ -1,7 +1,7 @@
 name: Release
 
-# Pushing a tag like v0.2.0 runs every check, then builds the backend image and pushes it to
-# ghcr.io/l03x/engram-backend:0.2.0. Deploying it to the cluster stays a manual step (README).
+# Pushing a tag like v0.2.0 runs every check, then builds the app image and pushes it to
+# ghcr.io/l03x/engram:0.2.0. Deploying it to the cluster stays a manual step (README).
 on:
   push:
     tags: ["v*.*.*"]
@@ -10,7 +10,7 @@ permissions:
   contents: read
 
 env:
-  IMAGE: ghcr.io/l03x/engram-backend
+  IMAGE: ghcr.io/l03x/engram
 
 jobs:
   backend:
@@ -81,7 +81,7 @@ jobs:
       # Both architectures, so the image runs whether the server is x86 or ARM.
       - uses: docker/build-push-action@v6
         with:
-          context: backend
+          context: .
           platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.meta.outputs.tags }}

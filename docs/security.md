@@ -42,6 +42,24 @@ Cards are Markdown with math and code. The client never renders raw HTML. Its pi
 3. Render math (KaTeX with `trust: false`) and highlight code on the sanitized tree.
 4. Output React elements. Nothing is set through `innerHTML`.
 
+## Response headers
+
+The backend serves the web app and the API from one origin, and puts these headers on every response:
+
+| Header | Value |
+|---|---|
+| `Content-Security-Policy` | `default-src 'self'`. Scripts from this origin only, never inline. Inline styles are allowed, because KaTeX and code highlighting position and color text with `style` attributes. Images may also come from any `https:` address, since cards can link them. No plugins, no `<base>`, and no framing (`frame-ancestors 'none'`). |
+| `X-Frame-Options` | `DENY`, for browsers that predate `frame-ancestors`. |
+| `X-Content-Type-Options` | `nosniff` |
+| `Referrer-Policy` | `no-referrer`, so links in cards don't tell other sites where they came from. |
+| `Cross-Origin-Opener-Policy` | `same-origin` |
+| `Permissions-Policy` | Camera, microphone, geolocation, payment and USB are off. |
+| `Strict-Transport-Security` | `max-age=31536000`. Browsers only honor it over HTTPS, so plain http on `127.0.0.1` is unaffected. |
+
+The end-to-end tests run the app as it's served in production and fail if the policy blocks anything.
+
+The page itself (`index.html`) is sent with `Cache-Control: no-cache`, so a release shows up on the next load. Files under `/assets/` have a content hash in their names and are cached for a year.
+
 ## Anki uploads
 
 An Anki import uploads a SQLite database, which is untrusted input:
@@ -53,7 +71,7 @@ An Anki import uploads a SQLite database, which is untrusted input:
 
 ## Containers
 
-- **Users:** the backend image runs as uid 10001; Postgres runs as uid 70 on k8s.
+- **Users:** the app image runs as uid 10001; Postgres runs as uid 70 on k8s.
 - **Filesystems:** root filesystems are read-only, with tmpfs or emptyDir for `/tmp`.
 - **Privileges:** all capabilities are dropped and privilege escalation is disabled.
 - **k8s:** the namespace enforces Pod Security `restricted`, pods get no service account token, and NetworkPolicies limit who reaches Postgres and the API.

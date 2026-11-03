@@ -1,20 +1,32 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 
-import { test as base, type APIRequestContext, type Page } from "@playwright/test";
+import { test as base, expect, type APIRequestContext, type Page } from "@playwright/test";
 
 import { BACKEND_URL, type TestUser } from "./stack";
 
 export { readStack } from "./stack";
 
-export { expect } from "@playwright/test";
+export { expect };
 
 export const EXAMPLE_DECK = JSON.parse(
   readFileSync(path.join(import.meta.dirname, "../../docs/example-deck.json"), "utf8"),
 ) as unknown;
 
 // An API client authenticated as a test user, for setting up data the spec isn't about.
+// Every page also fails its test if the Content Security Policy blocks anything: the app runs
+// as the backend serves it, headers included.
 export const test = base.extend<{ apiAs: (user: TestUser) => Promise<APIRequestContext> }>({
+  context: async ({ context }, use) => {
+    const blocked: string[] = [];
+    context.on("console", (message) => {
+      if (message.type() === "error" && message.text().includes("Content Security Policy")) {
+        blocked.push(message.text());
+      }
+    });
+    await use(context);
+    expect(blocked, "blocked by the Content Security Policy").toEqual([]);
+  },
   apiAs: async ({ playwright }, use) => {
     const contexts: APIRequestContext[] = [];
     await use(async (user) => {

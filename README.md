@@ -12,7 +12,7 @@ This file covers deployment only. Everything else is in [`docs/`](docs):
 - [Security](docs/security.md): sessions, rate limits, access rules, proxies
 - [Development](docs/development.md): running the checks and the end-to-end tests
 
-> **Not covered yet: serving the web app.** These files deploy the API (`/api`) and its database. They don't build or serve the frontend. Whatever serves it later must put the page and `/api` on **one origin**, because the refresh cookie and the CSRF header depend on it. Until then the frontend runs only in development (`npm run dev` in `frontend/`, on port 6969).
+Engram ships as one image, `ghcr.io/l03x/engram`. The backend serves the web app and the API (`/api`) from the same origin, which the refresh cookie and the CSRF header rely on. Next to it runs Postgres.
 
 ## Option 1: Docker Compose on one machine
 
@@ -26,11 +26,13 @@ docker compose exec backend python -m app.cli create-admin <your-username>
 curl -fsS http://127.0.0.1:6767/api/health/ready
 ```
 
+Then open http://127.0.0.1:6767 and sign in.
+
 | Service | What it does |
 |---|---|
 | `db` | Postgres 16. Data lives in the named volume `engram_pgdata`. |
 | `migrate` | Runs `alembic upgrade head` once, then exits. |
-| `backend` | The API, published on `127.0.0.1:6767` only. It starts after `migrate` succeeds. |
+| `backend` | The app: web pages and `/api`, published on `127.0.0.1:6767` only. It starts after `migrate` succeeds. |
 
 To upgrade, pull the new code and run `docker compose up -d --build --wait` again. Migrations run first.
 
@@ -43,8 +45,8 @@ The manifests in [`deploy/k8s/`](deploy/k8s) are plain kustomize. They contain n
 | `engram` | Namespace | Pod Security `restricted` enforced |
 | `postgres` | StatefulSet + headless Service | 5 Gi PVC on `local-path` |
 | `engram-migrate` | Job | `alembic upgrade head`, removed 10 minutes after it finishes |
-| `backend` | Deployment + ClusterIP Service at the fixed address `10.43.67.67:8000` | 1 replica. An initContainer waits until the schema matches the image. |
-| `default-deny-ingress`, `postgres`, `backend` | NetworkPolicy | Postgres accepts the backend and the Job only. The API accepts pods in the namespace only. |
+| `backend` | Deployment + ClusterIP Service at the fixed address `10.43.67.67:8000` | The app (web pages and `/api`). 1 replica. An initContainer waits until the schema matches the image. |
+| `default-deny-ingress`, `postgres`, `backend` | NetworkPolicy | Postgres accepts the backend and the Job only. The app accepts pods in the namespace only. |
 
 Every pod runs as non-root with a read-only root filesystem, no capabilities, the runtime's seccomp profile and no service account token.
 
@@ -63,37 +65,37 @@ In steady state Engram requests 416Mi and is capped at 896Mi.
 The usual way is to let GitHub do it. Set `version` in `backend/pyproject.toml`, commit, then push a matching tag:
 
 ```bash
-git tag v0.1.0
-git push origin v0.1.0
+git tag v0.2.0
+git push origin v0.2.0
 ```
 
 The [release workflow](.github/workflows/release.yml) then:
 
 1. Runs the backend and frontend checks.
-2. Builds the image for amd64 and arm64.
-3. Pushes it as `ghcr.io/l03x/engram-backend:0.1.0`.
+2. Builds the image for amd64 and arm64. The web app is built inside it, once, since its files are the same for both.
+3. Pushes it as `ghcr.io/l03x/engram:0.2.0`.
 
 It fails if the tag and the pyproject version disagree. It doesn't touch the cluster.
 
-To build by hand instead, run this on any machine with Docker, logged in to GHCR with a token that has `write:packages`:
+To build by hand instead, run this from the repository root on any machine with Docker, logged in to GHCR with a token that has `write:packages`:
 
 ```bash
 docker login ghcr.io -u l03x
-docker build -t ghcr.io/l03x/engram-backend:0.1.0 backend
-docker push ghcr.io/l03x/engram-backend:0.1.0
+docker build -t ghcr.io/l03x/engram:0.2.0 .
+docker push ghcr.io/l03x/engram:0.2.0
 ```
 
 If the server's CPU architecture differs from the build machine (an arm64 server, say), build for it instead:
 
 ```bash
-docker buildx build --platform linux/arm64 -t ghcr.io/l03x/engram-backend:0.1.0 --push backend
+docker buildx build --platform linux/arm64 -t ghcr.io/l03x/engram:0.2.0 --push .
 ```
 
 The tag the cluster runs is set in `deploy/k8s/kustomization.yaml` under `images`.
 
 ### 2. Let the cluster pull the image
 
-GHCR packages start out private. Either make `engram-backend` public (on GitHub: the package → Package settings → Change visibility), or give the namespace a pull secret. For the pull secret, create the namespace first, then use a token that has `read:packages` only:
+GHCR packages start out private. Either make `engram` public (on GitHub: the package → Package settings → Change visibility), or give the namespace a pull secret. For the pull secret, create the namespace first, then use a token that has `read:packages` only:
 
 ```bash
 kubectl apply -f deploy/k8s/namespace.yaml
@@ -131,7 +133,7 @@ kubectl -n engram exec -it deploy/backend -- python -m app.cli create-admin <you
 
 The admin then invites everyone else from the app.
 
-### 6. Check the API
+### 6. Check it
 
 On the k3s node itself:
 
@@ -139,23 +141,22 @@ On the k3s node itself:
 curl -fsS http://10.43.67.67:8000/api/health/ready
 ```
 
-From another machine, use `kubectl -n engram port-forward svc/backend 6767:8000` and `curl` `127.0.0.1:6767` instead.
+http://10.43.67.67:8000 in a browser on the node opens the app. From another machine, use `kubectl -n engram port-forward svc/backend 6767:8000` and `127.0.0.1:6767` instead.
 
 The Service's address is fixed in `backend.yaml` and sits in k3s's default service range. If your cluster uses a different `--service-cidr`, change it or remove the line. A Service's address can't change in place: if `apply` reports `may not change once set`, run `kubectl -n engram delete svc backend` once, then apply again.
 
 ### 7. Point the tunnel at it
 
-Inside the cluster the API is `http://backend.engram.svc.cluster.local:8000`. On the node itself it is `http://10.43.67.67:8000`, which is the address to use if cloudflared runs as a host service rather than a pod. Once something serves the web app, give the tunnel one public hostname that sends `/api/` to the backend and everything else to the web server. cloudflared's ingress rules can split by path:
+Inside the cluster the app is `http://backend.engram.svc.cluster.local:8000`. On the node itself it is `http://10.43.67.67:8000`, which is the address to use if cloudflared runs as a host service rather than a pod. One rule sends the whole hostname there, pages and `/api` alike:
 
 ```yaml
 ingress:
   - hostname: engram.example.com
-    path: ^/api/
     service: http://backend.engram.svc.cluster.local:8000
-  - hostname: engram.example.com
-    service: http://<your web server>
   - service: http_status:404
 ```
+
+If your tunnel still has a separate `^/api/` rule from before 0.2.0, remove it: the backend now answers every path.
 
 Two things depend on where cloudflared runs:
 
@@ -163,6 +164,8 @@ Two things depend on where cloudflared runs:
 - **Client IPs.** The rate limiter sees cloudflared's address, not the visitor's, until the backend is told to trust it. See `FORWARDED_ALLOW_IPS` in [configuration](docs/configuration.md).
 
 ### Upgrading
+
+**From 0.1.x to 0.2.0:** the image was renamed from `engram-backend` to `engram`, and it now contains the web app. On GitHub that's a new package, which starts out private again: make it public, or keep using the pull secret from step 2. Also simplify the tunnel to the single rule in step 7.
 
 Release the new version (step 1), wait for the workflow to finish, then set the new tag under `images` in `kustomization.yaml`. A Job can't be changed in place, so delete the finished one before applying:
 

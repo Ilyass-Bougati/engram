@@ -13,6 +13,8 @@ Engram reads its configuration from environment variables only. It reads no `.en
 
 The migration Job, the `wait-for-migrations` initContainer and the admin CLI load the same settings, so they need `DATABASE_URL` and `JWT_SECRET` too.
 
+The web app needs no configuration: it's built into the image and calls the API on its own origin.
+
 ## Deployment files
 
 | Variable | Where | Meaning |
