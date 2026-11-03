@@ -7,7 +7,7 @@ from starlette.types import ASGIApp, Receive, Scope, Send
 from app.db import SessionDep
 from app.deps import PUBLIC
 from app.models import CardKind
-from app.routers import admin, auth, cards, decks, invites, me, members
+from app.routers import admin, auth, cards, decks, invites, me, members, reviews
 
 # Deck imports are the largest legitimate bodies; nginx enforces the same cap in front.
 MAX_BODY_BYTES = 2 * 1024 * 1024
@@ -97,7 +97,7 @@ def ready(session: SessionDep) -> dict[str, str]:
     return {"status": "ok"}
 
 
-for module in (auth, invites, me, admin, decks, members, cards):
+for module in (auth, invites, me, admin, decks, members, cards, reviews):
     api.include_router(module.router)
 
 app.include_router(api)

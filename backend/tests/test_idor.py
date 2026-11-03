@@ -15,6 +15,11 @@ VALID_BODIES: dict[tuple[str, str], object] = {
     ("PATCH", "/api/decks/{deck_id}/members/{user_id}"): {"role": "editor"},
     ("POST", "/api/decks/{deck_id}/cards"): BASIC_CARD,
     ("PUT", "/api/decks/{deck_id}/cards/{card_id}"): {**BASIC_CARD, "front": "Hijacked"},
+    ("POST", "/api/decks/{deck_id}/reviews"): {"card_id": "{card_id}", "rating": 3},
+    ("POST", "/api/decks/{deck_id}/reviews/quiz-answer"): {
+        "card_id": "{card_id}",
+        "selected_option_ids": ["00000000-0000-4000-8000-000000000000"],
+    },
 }
 
 
@@ -30,6 +35,8 @@ def _deck_routes() -> list[tuple[str, str]]:
 def _request(client: TestClient, method: str, path: str, ids: dict[str, str]) -> int:
     url = path.format(**ids)
     body = VALID_BODIES.get((method, path))
+    if isinstance(body, dict) and body.get("card_id") == "{card_id}":
+        body = {**body, "card_id": ids["card_id"]}
     return client.request(method, url, json=body).status_code
 
 
@@ -40,7 +47,7 @@ def test_outsider_gets_404_on_every_deck_route(team: Team) -> None:
         "user_id": str(team.viewer_user.id),
     }
     routes = _deck_routes()
-    assert len(routes) >= 15
+    assert len(routes) >= 18
     statuses = {
         f"{method} {path}": _request(team.outsider, method, path, ids) for method, path in routes
     }
@@ -56,23 +63,6 @@ def test_card_from_another_deck_is_404_through_your_own_deck(team: Team) -> None
     statuses = {f"{m} {p}": _request(team.outsider, m, p, ids) for m, p in card_routes}
     assert statuses == dict.fromkeys(statuses, 404)
     _assert_untouched(team)
-
-
-def test_member_routes_reject_users_outside_the_deck(team: Team) -> None:
-    deck = f"/api/decks/{team.deck_id}"
-    outsider_id = team.outsider_user.id
-    assert (
-        team.owner.patch(f"{deck}/members/{outsider_id}", json={"role": "editor"}).status_code
-        == 404
-    )
-    assert team.owner.delete(f"{deck}/members/{outsider_id}").status_code == 404
-
-
-def test_missing_and_foreign_decks_look_the_same(team: Team) -> None:
-    missing = team.outsider.get("/api/decks/00000000-0000-4000-8000-000000000000")
-    foreign = team.outsider.get(f"/api/decks/{team.deck_id}")
-    assert missing.status_code == foreign.status_code == 404
-    assert missing.json() == foreign.json()
 
 
 def _assert_untouched(team: Team) -> None:

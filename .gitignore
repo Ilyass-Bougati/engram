@@ -10,4 +10,5 @@ node_modules/
 dist/
 frontend/test-results/
 frontend/playwright-report/
+frontend/screenshots/
 PLAN.md

@@ -157,3 +157,40 @@ class CardTag(SQLModel, table=True):
 
     card_id: uuid.UUID = Field(foreign_key="card.id", ondelete="CASCADE", primary_key=True)
     tag: str = Field(primary_key=True, index=True)
+
+
+class ReviewState(SQLModel, table=True):
+    __tablename__ = "review_state"
+    __table_args__ = (sa.Index("ix_review_state_user_id_due", "user_id", "due"),)
+
+    user_id: uuid.UUID = Field(foreign_key="user.id", ondelete="CASCADE", primary_key=True)
+    card_id: uuid.UUID = Field(foreign_key="card.id", ondelete="CASCADE", primary_key=True)
+    # FSRS card fields, as py-fsrs defines them; state is fsrs.State (1 learning, 2 review,
+    # 3 relearning).
+    state: int
+    step: int | None = None
+    stability: float | None = None
+    difficulty: float | None = None
+    due: datetime = Field(sa_type=Timestamp)
+    last_review: datetime | None = Field(default=None, sa_type=Timestamp)
+    # When the card first entered this user's study; drives the daily new-card limit.
+    introduced_at: datetime = Field(default_factory=utcnow, sa_type=Timestamp)
+    # Set by a correct quiz answer and cleared by the rating that follows, so Hard/Good/Easy
+    # on a quiz card is only accepted after the server graded it correct.
+    quiz_correct_pending_at: datetime | None = Field(default=None, sa_type=Timestamp)
+
+
+class ReviewLog(SQLModel, table=True):
+    __tablename__ = "review_log"
+    __table_args__ = (
+        sa.Index("ix_review_log_user_id_card_id_reviewed_at", "user_id", "card_id", "reviewed_at"),
+        sa.CheckConstraint("rating BETWEEN 1 AND 4", name="rating_range"),
+    )
+
+    id: int | None = Field(
+        default=None, sa_column=sa.Column(sa.BigInteger, sa.Identity(), primary_key=True)
+    )
+    user_id: uuid.UUID = Field(foreign_key="user.id", ondelete="CASCADE")
+    card_id: uuid.UUID = Field(foreign_key="card.id", ondelete="CASCADE")
+    rating: int = Field(sa_type=sa.SmallInteger)
+    reviewed_at: datetime = Field(default_factory=utcnow, sa_type=Timestamp)

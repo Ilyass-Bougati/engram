@@ -1,0 +1,136 @@
+@import "tailwindcss";
+@import "./tokens.css";
+
+/*
+ * Tailwind's default palette, type scale, radii, shadows, fonts and easings are cleared, so a
+ * class like bg-indigo-500 or rounded-3xl doesn't exist and only the tokens above can be used.
+ */
+@theme {
+  --color-*: initial;
+  --text-*: initial;
+  --radius-*: initial;
+  --shadow-*: initial;
+  --font-*: initial;
+  --ease-*: initial;
+  --animate-*: initial;
+  --spacing: 0.25rem;
+
+  --font-sans: "IBM Plex Sans Variable", "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "IBM Plex Mono", Menlo, Consolas, monospace;
+
+  /* 12 / 14 / 16 / 18 / 22 / 28 / 36 px, plus the fluid size used on the review card. */
+  --text-xs: 0.75rem;
+  --text-xs--line-height: 1rem;
+  --text-sm: 0.875rem;
+  --text-sm--line-height: 1.25rem;
+  --text-base: 1rem;
+  --text-base--line-height: 1.5rem;
+  --text-lg: 1.125rem;
+  --text-lg--line-height: 1.75rem;
+  --text-xl: 1.375rem;
+  --text-xl--line-height: 1.875rem;
+  --text-2xl: 1.75rem;
+  --text-2xl--line-height: 2.25rem;
+  --text-2xl--letter-spacing: -0.01em;
+  --text-3xl: 2.25rem;
+  --text-3xl--line-height: 2.75rem;
+  --text-3xl--letter-spacing: -0.015em;
+  --text-review: clamp(1.375rem, 1rem + 1.5vw, 1.75rem);
+  --text-review--line-height: 1.5;
+
+  /* Nothing above 16px: 6 for controls, 10 for containers, 14 for the review card and dialogs. */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-full: 9999px;
+
+  /* The only shadow, for raised controls; never paired with a border on the same element. */
+  --shadow-raised: 0 1px 2px rgb(0 0 0 / 0.06);
+
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+
+  /* Dialogs fade and settle into place: they communicate "opened", nothing more. */
+  --animate-fade-in: fade-in var(--duration-slow) var(--ease-standard);
+  --animate-dialog-in: dialog-in var(--duration-slow) var(--ease-standard);
+  --animate-menu-in: fade-in var(--duration-fast) var(--ease-standard);
+
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+    }
+  }
+
+  @keyframes dialog-in {
+    from {
+      opacity: 0;
+      /* Composes with the centering `translate` property set by the utilities. */
+      transform: translateY(8px);
+    }
+  }
+}
+
+/* shadcn/ui's semantic names, mapped onto the Engram tokens instead of its default theme. */
+@theme inline {
+  --color-background: var(--paper-top);
+  --color-foreground: var(--ink);
+  --color-card: var(--surface);
+  --color-card-foreground: var(--ink);
+  --color-popover: var(--glass-fill);
+  --color-popover-foreground: var(--ink);
+  --color-primary: var(--pine);
+  --color-primary-foreground: var(--on-pine);
+  --color-secondary: var(--surface);
+  --color-secondary-foreground: var(--ink);
+  --color-muted: var(--surface-sunken);
+  --color-muted-foreground: var(--ink-muted);
+  --color-accent: var(--pine-soft);
+  --color-accent-foreground: var(--ink);
+  --color-destructive: var(--danger);
+  --color-destructive-foreground: var(--on-danger);
+  --color-border: var(--line);
+  --color-input: var(--line-strong);
+  --color-ring: var(--focus);
+  --color-scrim: var(--scrim);
+
+  --color-rating-again: var(--rating-again);
+  --color-rating-hard: var(--rating-hard);
+  --color-rating-good: var(--rating-good);
+  --color-rating-easy: var(--rating-easy);
+}
+
+@utility glass {
+  background-color: var(--glass-fill);
+  backdrop-filter: blur(var(--glass-blur)) saturate(140%);
+  border: 1px solid var(--glass-edge);
+}
+
+@layer base {
+  html {
+    font-family: var(--font-sans);
+    color: var(--ink);
+    background-color: var(--paper-top);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    min-height: 100dvh;
+    background: linear-gradient(180deg, var(--paper-top), var(--paper-bottom));
+  }
+
+  code,
+  kbd,
+  pre {
+    font-family: var(--font-mono);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+
+  ::selection {
+    background-color: var(--pine-soft);
+    color: var(--ink);
+  }
+}

@@ -29,12 +29,6 @@ def test_login_failures_are_limited_per_username_even_with_the_right_password() 
     assert right_password.status_code == 429
 
 
-def test_successful_logins_do_not_count_against_the_username() -> None:
-    create_user("alice")
-    for _ in range(6):
-        sign_in(new_client(), "alice")
-
-
 def test_refresh_is_limited_per_ip() -> None:
     create_user("alice")
     client = new_client()

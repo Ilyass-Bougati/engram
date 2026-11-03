@@ -2,7 +2,7 @@
 
 A self-hosted spaced-repetition flashcard app for a small group of people. Accounts are invite-only.
 
-Status: Phase 2 of 6. Done so far: accounts, invites, sessions, the admin CLI, decks, cards, sharing, roles, forking, and JSON import/export. See `PLAN.md`.
+Status: Phase 3 of 6. The backend is complete (accounts, decks, sharing, import/export, reviews with FSRS scheduling); the web client comes next. See `PLAN.md`.
 
 ## Run it with Docker Compose
 

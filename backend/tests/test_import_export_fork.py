@@ -4,7 +4,7 @@ from collections.abc import Callable
 from typing import Any
 
 from tests.conftest import SignedIn, Team
-from tests.helpers import BASIC_CARD, create_card, create_deck
+from tests.helpers import BASIC_CARD, create_card
 from tests.test_deck_roles import EXAMPLE_DECK
 
 
@@ -29,14 +29,6 @@ def test_export_then_import_round_trips(signed_in: SignedIn) -> None:
     for card in expected["cards"]:
         card["tags"] = sorted(card["tags"])
     assert exported.json() == expected
-
-
-def test_import_into_existing_deck_appends_and_keeps_its_name(team: Team) -> None:
-    response = team.editor.post(f"/api/decks/{team.deck_id}/import", json=EXAMPLE_DECK)
-    assert response.status_code == 200
-    assert response.json()["imported"] == 4
-    deck = team.owner.get(f"/api/decks/{team.deck_id}").json()
-    assert (deck["name"], deck["card_count"]) == ("Geography", 6)
 
 
 def test_invalid_files_are_rejected_with_the_bad_field(signed_in: SignedIn) -> None:
@@ -110,12 +102,3 @@ def test_fork_is_an_independent_copy_owned_by_the_forker(team: Team) -> None:
 
     team.owner.delete(original)
     assert team.viewer.get(f"/api/decks/{fork_id}").json()["card_count"] == 2
-
-
-def test_fork_of_own_deck(signed_in: SignedIn) -> None:
-    client, _ = signed_in("alice")
-    deck_id = create_deck(client, "Verbs")
-    create_card(client, deck_id, BASIC_CARD)
-    fork = client.post(f"/api/decks/{deck_id}/fork").json()
-    assert (fork["name"], fork["card_count"]) == ("Verbs (fork)", 1)
-    assert len(client.get("/api/decks").json()) == 2

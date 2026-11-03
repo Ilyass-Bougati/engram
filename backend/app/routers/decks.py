@@ -1,5 +1,6 @@
 import re
 import uuid
+from collections.abc import Sequence
 from datetime import datetime
 from typing import Annotated
 
@@ -12,6 +13,7 @@ from app.db import SessionDep
 from app.deck_format import DeckFile, DeckMeta
 from app.deps import CurrentUser, DeckAccess, EditorAccess, OwnerAccess, ViewerAccess
 from app.models import Card, Deck, DeckMember, DeckRole, User, utcnow
+from app.scheduling import study_counts
 from app.schemas import StrictModel
 
 router = APIRouter(prefix="/decks", tags=["decks"])
@@ -23,26 +25,43 @@ class DeckView(BaseModel):
     description: str
     role: DeckRole
     card_count: int
+    # For the signed-in user: cards due now, and new cards still available today.
+    due_count: int
+    new_count: int
     new_cards_per_day: int
     created_at: datetime
     updated_at: datetime
 
 
-def _deck_view(deck: Deck, member: DeckMember, card_count: int) -> DeckView:
-    return DeckView(
-        id=deck.id,
-        name=deck.name,
-        description=deck.description,
-        role=member.role,
-        card_count=card_count,
-        new_cards_per_day=member.new_cards_per_day,
-        created_at=deck.created_at,
-        updated_at=deck.updated_at,
+def _deck_views(
+    session: Session, user: User, rows: Sequence[tuple[Deck, DeckMember]]
+) -> list[DeckView]:
+    deck_ids = [deck.id for deck, _ in rows]
+    card_counts = dict(
+        session.exec(
+            select(Card.deck_id, func.count())
+            .where(col(Card.deck_id).in_(deck_ids))
+            .group_by(col(Card.deck_id))
+        ).all()
     )
-
-
-def _card_count(session: Session, deck_id: uuid.UUID) -> int:
-    return session.exec(select(func.count()).where(Card.deck_id == deck_id)).one()
+    counts = study_counts(
+        session, user, {deck.id: member.new_cards_per_day for deck, member in rows}, utcnow()
+    )
+    return [
+        DeckView(
+            id=deck.id,
+            name=deck.name,
+            description=deck.description,
+            role=member.role,
+            card_count=card_counts.get(deck.id, 0),
+            due_count=counts[deck.id].due,
+            new_count=counts[deck.id].new,
+            new_cards_per_day=member.new_cards_per_day,
+            created_at=deck.created_at,
+            updated_at=deck.updated_at,
+        )
+        for deck, member in rows
+    ]
 
 
 def _create_owned_deck(session: Session, user: User, meta: DeckMeta) -> tuple[Deck, DeckMember]:
@@ -56,26 +75,20 @@ def _create_owned_deck(session: Session, user: User, meta: DeckMeta) -> tuple[De
 
 @router.get("")
 def list_decks(user: CurrentUser, session: SessionDep) -> list[DeckView]:
-    card_counts = (
-        select(Card.deck_id, func.count().label("card_count"))
-        .group_by(col(Card.deck_id))
-        .subquery()
-    )
     rows = session.exec(
-        select(Deck, DeckMember, func.coalesce(card_counts.c.card_count, 0))
+        select(Deck, DeckMember)
         .join(DeckMember)
-        .outerjoin(card_counts, card_counts.c.deck_id == Deck.id)
         .where(DeckMember.user_id == user.id)
         .order_by(func.lower(Deck.name), col(Deck.created_at))
     ).all()
-    return [_deck_view(deck, member, card_count) for deck, member, card_count in rows]
+    return _deck_views(session, user, rows)
 
 
 @router.post("", status_code=status.HTTP_201_CREATED)
 def create_deck(body: DeckMeta, user: CurrentUser, session: SessionDep) -> DeckView:
     deck, member = _create_owned_deck(session, user, body)
     session.commit()
-    return _deck_view(deck, member, 0)
+    return _deck_views(session, user, [(deck, member)])[0]
 
 
 @router.post("/import", status_code=status.HTTP_201_CREATED)
@@ -83,12 +96,12 @@ def import_new_deck(body: DeckFile, user: CurrentUser, session: SessionDep) -> D
     deck, member = _create_owned_deck(session, user, body.deck)
     add_cards(session, deck.id, body.cards)
     session.commit()
-    return _deck_view(deck, member, len(body.cards))
+    return _deck_views(session, user, [(deck, member)])[0]
 
 
 @router.get("/{deck_id}")
 def get_deck(access: ViewerAccess, session: SessionDep) -> DeckView:
-    return _deck_view(access.deck, access.member, _card_count(session, access.deck.id))
+    return _deck_views(session, access.user, [(access.deck, access.member)])[0]
 
 
 class DeckUpdate(StrictModel):
@@ -108,7 +121,7 @@ def update_deck(body: DeckUpdate, access: OwnerAccess, session: SessionDep) -> D
     deck.updated_at = utcnow()
     session.add(deck)
     session.commit()
-    return _deck_view(deck, access.member, _card_count(session, deck.id))
+    return _deck_views(session, access.user, [(deck, access.member)])[0]
 
 
 @router.delete("/{deck_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -129,7 +142,7 @@ def update_my_deck_settings(
     access.member.new_cards_per_day = body.new_cards_per_day
     session.add(access.member)
     session.commit()
-    return _deck_view(access.deck, access.member, _card_count(session, access.deck.id))
+    return _deck_views(session, access.user, [(access.deck, access.member)])[0]
 
 
 def _deck_file(session: Session, access: DeckAccess) -> DeckFile:
@@ -156,7 +169,7 @@ def fork_deck(access: ViewerAccess, session: SessionDep) -> DeckView:
     deck, member = _create_owned_deck(session, access.user, meta)
     add_cards(session, deck.id, source.cards)
     session.commit()
-    return _deck_view(deck, member, len(source.cards))
+    return _deck_views(session, access.user, [(deck, member)])[0]
 
 
 @router.get("/{deck_id}/export")
@@ -175,5 +188,5 @@ class ImportResult(BaseModel):
 def import_into_deck(body: DeckFile, access: EditorAccess, session: SessionDep) -> ImportResult:
     add_cards(session, access.deck.id, body.cards)
     session.commit()
-    deck_view = _deck_view(access.deck, access.member, _card_count(session, access.deck.id))
+    [deck_view] = _deck_views(session, access.user, [(access.deck, access.member)])
     return ImportResult(imported=len(body.cards), deck=deck_view)

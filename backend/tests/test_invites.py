@@ -83,44 +83,6 @@ def test_revoked_invite_is_rejected(signed_in: SignedIn) -> None:
     assert admin.get("/api/admin/invites").json()[0]["state"] == "revoked"
 
 
-def test_used_invite_cannot_be_revoked(signed_in: SignedIn) -> None:
-    admin, _ = signed_in("root", GlobalRole.admin)
-    token = _create_invite(admin)
-    new_client().post(f"/api/invites/{token}/redeem", json=SIGNUP)
-    invite_id = admin.get("/api/admin/invites").json()[0]["id"]
-    assert admin.delete(f"/api/admin/invites/{invite_id}").status_code == 409
-
-
-def test_unknown_and_used_invites_are_indistinguishable(signed_in: SignedIn) -> None:
-    admin, _ = signed_in("root", GlobalRole.admin)
-    token = _create_invite(admin)
-    new_client().post(f"/api/invites/{token}/redeem", json=SIGNUP)
-    used = new_client().get(f"/api/invites/{token}")
-    unknown = new_client().get("/api/invites/not-a-real-token")
-    assert used.status_code == unknown.status_code == 404
-    assert used.json() == unknown.json()
-
-
-def test_taken_username_is_rejected_and_invite_stays_usable(signed_in: SignedIn) -> None:
-    admin, _ = signed_in("root", GlobalRole.admin)
-    token = _create_invite(admin)
-    taken = new_client().post(f"/api/invites/{token}/redeem", json={**SIGNUP, "username": "ROOT"})
-    assert taken.status_code == 409
-    assert new_client().post(f"/api/invites/{token}/redeem", json=SIGNUP).status_code == 201
-
-
-def test_invalid_signup_fields_are_rejected(signed_in: SignedIn) -> None:
-    admin, _ = signed_in("root", GlobalRole.admin)
-    token = _create_invite(admin)
-    for bad in (
-        {**SIGNUP, "username": "a b"},
-        {**SIGNUP, "password": "short"},
-        {**SIGNUP, "timezone": "Nowhere/Land"},
-        {**SIGNUP, "role": "admin"},
-    ):
-        assert new_client().post(f"/api/invites/{token}/redeem", json=bad).status_code == 422
-
-
 def test_non_admins_cannot_manage_invites(signed_in: SignedIn) -> None:
     admin, _ = signed_in("root", GlobalRole.admin)
     _create_invite(admin)

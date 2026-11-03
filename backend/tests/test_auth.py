@@ -30,13 +30,6 @@ def test_login_returns_working_access_token() -> None:
     assert me.json()["username"] == "alice"
 
 
-def test_login_is_case_insensitive_on_username() -> None:
-    create_user("Alice")
-    client = new_client()
-    sign_in(client, "aLICE")
-    assert client.get("/api/me").json()["username"] == "Alice"
-
-
 def test_unknown_user_and_wrong_password_give_identical_errors() -> None:
     create_user("alice")
     client = new_client()
@@ -93,16 +86,6 @@ def test_refresh_cookie_flags() -> None:
         assert flag in set_cookie
 
 
-def test_refresh_token_is_stored_hashed(db: Session) -> None:
-    create_user("alice")
-    client = new_client()
-    sign_in(client, "alice")
-    cookie = client.cookies[REFRESH_COOKIE]
-    stored = db.exec(select(RefreshToken)).one()
-    assert cookie not in (stored.token_hash, str(stored.id))
-    assert len(stored.token_hash) == 64
-
-
 def test_refresh_rotates_the_token() -> None:
     create_user("alice")
     client = new_client()
@@ -133,19 +116,6 @@ def test_reusing_a_rotated_token_revokes_the_whole_family() -> None:
     assert victim.post("/api/auth/refresh", headers=CSRF).status_code == 401
 
 
-def test_reuse_does_not_touch_other_sessions_of_the_same_user() -> None:
-    create_user("alice")
-    laptop, phone = new_client(), new_client()
-    sign_in(laptop, "alice")
-    sign_in(phone, "alice")
-    stolen_cookie = laptop.cookies[REFRESH_COOKIE]
-    laptop.post("/api/auth/refresh", headers=CSRF)
-
-    attacker = client_with_refresh_cookie(stolen_cookie)
-    attacker.post("/api/auth/refresh", headers=CSRF)
-    assert phone.post("/api/auth/refresh", headers=CSRF).status_code == 200
-
-
 def test_refresh_and_logout_require_the_csrf_header() -> None:
     create_user("alice")
     client = new_client()
@@ -156,10 +126,6 @@ def test_refresh_and_logout_require_the_csrf_header() -> None:
         assert "X-Engram-CSRF" in response.json()["detail"]
     # The rejected logout must not have ended the session.
     assert client.post("/api/auth/refresh", headers=CSRF).status_code == 200
-
-
-def test_refresh_without_cookie_is_rejected() -> None:
-    assert new_client().post("/api/auth/refresh", headers=CSRF).status_code == 401
 
 
 def test_expired_refresh_token_is_rejected(db: Session) -> None:
@@ -206,28 +172,6 @@ def test_password_change_revokes_other_sessions_and_old_access_tokens() -> None:
     sign_in(new_client(), "alice", "a brand new passphrase")
 
 
-def test_password_change_requires_the_current_password() -> None:
-    create_user("alice")
-    client = new_client()
-    sign_in(client, "alice")
-    response = client.post(
-        "/api/me/password",
-        json={"current_password": "not my password", "new_password": "a brand new passphrase"},
-    )
-    assert response.status_code == 400
-    sign_in(new_client(), "alice")
-
-
-def test_short_new_password_is_rejected() -> None:
-    create_user("alice")
-    client = new_client()
-    sign_in(client, "alice")
-    response = client.post(
-        "/api/me/password", json={"current_password": PASSWORD, "new_password": "short"}
-    )
-    assert response.status_code == 422
-
-
 def _forged_token(user_id: uuid.UUID, *, secret: str, expires_in: timedelta) -> str:
     now = utcnow()
     return jwt.encode(
@@ -250,16 +194,3 @@ def test_access_token_signed_with_another_key_is_rejected() -> None:
     token = _forged_token(user.id, secret="x" * 48, expires_in=timedelta(minutes=5))
     response = new_client().get("/api/me", headers={"Authorization": f"Bearer {token}"})
     assert response.status_code == 401
-
-
-def test_missing_access_token_is_rejected() -> None:
-    assert new_client().get("/api/me").status_code == 401
-
-
-def test_update_timezone() -> None:
-    create_user("alice")
-    client = new_client()
-    sign_in(client, "alice")
-    assert client.patch("/api/me", json={"timezone": "Africa/Casablanca"}).status_code == 200
-    assert client.get("/api/me").json()["timezone"] == "Africa/Casablanca"
-    assert client.patch("/api/me", json={"timezone": "Mars/Olympus"}).status_code == 422

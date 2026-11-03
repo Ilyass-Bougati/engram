@@ -1,0 +1,82 @@
+/*
+ * Engram design tokens: the single source for color, type, spacing, radii, shadows, glass and
+ * motion. Each color carries its light and dark value side by side through light-dark(), which
+ * follows color-scheme: the OS setting by default, or data-theme="light|dark" on <html> when the
+ * user picks one. src/styles/contrast.test.ts parses this file and checks WCAG AA, so keep every
+ * color as a literal hex or rgb() value.
+ */
+
+:root {
+  color-scheme: light dark;
+
+  /* Warm neutrals. The page background is a low-contrast vertical gradient. */
+  --paper-top: light-dark(#f4f2ee, #141517);
+  --paper-bottom: light-dark(#ebe8e2, #191a1d);
+  --surface: light-dark(#fbfaf8, #1e1f22);
+  --surface-sunken: light-dark(#efede8, #18191b);
+  --ink: light-dark(#1c1b19, #eceae6);
+  --ink-muted: light-dark(#57544e, #b0ada6);
+  --line: light-dark(rgb(28 27 25 / 0.12), rgb(236 234 230 / 0.12));
+  /* Control outlines: solid, and at least 3:1 against surfaces (WCAG 1.4.11). */
+  --line-strong: light-dark(#807c74, #75726c);
+
+  /* One accent: pine. No purple, indigo, violet or cyan anywhere. */
+  --pine: light-dark(#285f45, #7db592);
+  --on-pine: light-dark(#ffffff, #10140f);
+  --pine-soft: light-dark(#e2ede6, #243429);
+  --danger: light-dark(#a3372b, #e58a7e);
+  --on-danger: light-dark(#ffffff, #1a0f0d);
+  --focus: light-dark(#285f45, #8fc7a4);
+
+  /* Review ratings. Always shown with a label and key number, never color alone. */
+  --rating-again: light-dark(#a3372b, #e58a7e);
+  --rating-hard: light-dark(#7d5110, #d9a75a);
+  --rating-good: light-dark(#285f45, #7db592);
+  --rating-easy: light-dark(#3a5a78, #93b3d1);
+
+  /*
+   * Glass: only for the review card, the top navigation, and dialogs/popovers. Fairly opaque
+   * fill, strong blur, one edge (a border), no shadow.
+   */
+  --glass-fill: light-dark(rgb(251 250 248 / 0.84), rgb(30 31 34 / 0.88));
+  --glass-edge: light-dark(rgb(28 27 25 / 0.1), rgb(236 234 230 / 0.1));
+  --glass-blur: 24px;
+  --scrim: light-dark(rgb(28 27 25 / 0.32), rgb(0 0 0 / 0.56));
+
+  /* Motion: deceleration only, no overshoot. */
+  --duration-fast: 120ms;
+  --duration-base: 200ms;
+  --duration-slow: 280ms;
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+}
+
+/* Glass becomes a solid surface wherever transparency would hurt legibility or isn't drawn. */
+@media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
+  :root {
+    --glass-fill: var(--surface);
+    --glass-edge: var(--line-strong);
+    --glass-blur: 0px;
+  }
+}
+
+@supports not (backdrop-filter: blur(1px)) {
+  :root {
+    --glass-fill: var(--surface);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --duration-fast: 0ms;
+    --duration-base: 0ms;
+    --duration-slow: 0ms;
+  }
+}

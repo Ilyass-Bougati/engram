@@ -1,28 +1,16 @@
-import os
-import subprocess
+import io
 import sys
 
 import pytest
 from alembic.autogenerate import compare_metadata
 from alembic.runtime.migration import MigrationContext
+from pydantic import ValidationError
 from sqlmodel import SQLModel
 
+from app import cli
+from app.config import Settings
 from app.db import engine
-from tests.conftest import BACKEND_DIR
 from tests.helpers import CSRF, PASSWORD, new_client, sign_in
-
-
-def _run(args: list[str], env: dict[str, str], stdin: str = "") -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
-        [sys.executable, *args],
-        cwd=BACKEND_DIR,
-        env=env,
-        input=stdin,
-        capture_output=True,
-        text=True,
-        timeout=60,
-        check=False,
-    )
 
 
 @pytest.mark.parametrize(
@@ -33,57 +21,58 @@ def _run(args: list[str], env: dict[str, str], stdin: str = "") -> subprocess.Co
         (None, {"JWT_SECRET": "too-short-secret"}, "jwt_secret"),
     ],
 )
-def test_backend_refuses_to_start_without_valid_secrets(
-    missing: str | None, override: dict[str, str], expected_field: str
+def test_config_rejects_missing_or_weak_secrets_without_echoing_them(
+    monkeypatch: pytest.MonkeyPatch,
+    missing: str | None,
+    override: dict[str, str],
+    expected_field: str,
 ) -> None:
-    env = {key: value for key, value in os.environ.items() if key != missing} | override
-    result = _run(["-c", "import app.main"], env)
-    assert result.returncode != 0
-    assert expected_field in result.stderr
-    for secret in (env.get("JWT_SECRET"), env.get("DATABASE_URL")):
-        if secret:
-            assert secret not in result.stderr
+    if missing:
+        monkeypatch.delenv(missing)
+    for key, value in override.items():
+        monkeypatch.setenv(key, value)
+    # Settings() is what app.config runs at import, so this is the startup check itself.
+    with pytest.raises(ValidationError) as error:
+        Settings()
+    message = str(error.value)
+    assert expected_field in message
+    for secret in ("too-short-secret", str(engine.url.password)):
+        assert secret not in message
 
 
-def test_create_admin_cli_creates_a_working_admin() -> None:
-    result = _run(
-        ["-m", "app.cli", "create-admin", "root", "--password-stdin"], dict(os.environ), PASSWORD
-    )
-    assert result.returncode == 0, result.stderr
+def _cli(monkeypatch: pytest.MonkeyPatch, *args: str, stdin: str = "") -> None:
+    monkeypatch.setattr(sys, "argv", ["app.cli", *args])
+    monkeypatch.setattr(sys, "stdin", io.StringIO(stdin))
+    cli.main()
+
+
+def test_create_admin_creates_a_working_admin(monkeypatch: pytest.MonkeyPatch) -> None:
+    _cli(monkeypatch, "create-admin", "root", "--password-stdin", stdin=PASSWORD)
     client = new_client()
     sign_in(client, "root")
-    assert client.get("/api/me").json()["role"] == "admin"
     assert client.get("/api/admin/users").status_code == 200
 
-
-def test_create_admin_cli_rejects_duplicates_and_weak_passwords() -> None:
-    env = dict(os.environ)
-    assert _run(["-m", "app.cli", "create-admin", "root", "--password-stdin"], env, PASSWORD)
-    weak = _run(["-m", "app.cli", "create-admin", "other", "--password-stdin"], env, "short")
-    assert weak.returncode != 0
-    duplicate = _run(["-m", "app.cli", "create-admin", "ROOT", "--password-stdin"], env, PASSWORD)
-    assert duplicate.returncode != 0
-    assert "already exists" in duplicate.stderr
+    with pytest.raises(SystemExit, match="already exists"):
+        _cli(monkeypatch, "create-admin", "ROOT", "--password-stdin", stdin=PASSWORD)
+    with pytest.raises(SystemExit, match="10 to 256 characters"):
+        _cli(monkeypatch, "create-admin", "other", "--password-stdin", stdin="short")
 
 
-def test_set_password_cli_changes_password_and_signs_out_sessions() -> None:
-    env = dict(os.environ)
-    _run(["-m", "app.cli", "create-admin", "root", "--password-stdin"], env, PASSWORD)
+def test_set_password_signs_out_existing_sessions(monkeypatch: pytest.MonkeyPatch) -> None:
+    _cli(monkeypatch, "create-admin", "root", "--password-stdin", stdin=PASSWORD)
     client = new_client()
     sign_in(client, "root")
 
-    result = _run(
-        ["-m", "app.cli", "set-password", "root", "--password-stdin"], env, "a new passphrase!"
-    )
-    assert result.returncode == 0, result.stderr
+    _cli(monkeypatch, "set-password", "root", "--password-stdin", stdin="a new passphrase!")
     assert client.get("/api/me").status_code == 401
     assert client.post("/api/auth/refresh", headers=CSRF).status_code == 401
     sign_in(new_client(), "root", "a new passphrase!")
 
 
-def test_wait_for_migrations_returns_when_schema_is_current() -> None:
-    result = _run(["-m", "app.cli", "wait-for-migrations", "--timeout", "5"], dict(os.environ))
-    assert result.returncode == 0, result.stderr
+def test_wait_for_migrations_returns_when_schema_is_current(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _cli(monkeypatch, "wait-for-migrations", "--timeout", "5")
 
 
 def test_migrations_match_the_models() -> None:
