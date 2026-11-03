@@ -112,6 +112,10 @@ export const router = createBrowserRouter([
               { path: "/decks/:deckId", lazy: loadDeckPage },
               { path: "/decks/:deckId/cards/new", lazy: loadCardEditor },
               { path: "/decks/:deckId/cards/:cardId", lazy: loadCardEditor },
+              {
+                path: "/stats",
+                lazy: async () => ({ Component: (await import("@/routes/Stats")).StatsPage }),
+              },
               { path: "/settings", element: <SettingsPage /> },
               {
                 element: <RequireAdmin />,

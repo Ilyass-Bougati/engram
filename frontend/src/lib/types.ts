@@ -30,6 +30,15 @@ export interface Deck {
   updated_at: string;
 }
 
+export interface AnkiImportResult {
+  deck: Deck;
+  imported: number;
+  // Left out: a side was empty without its media, or too long.
+  skipped: number;
+  media_removed: number;
+  reviews_imported: number;
+}
+
 export interface QuizOption {
   id: string;
   text: string;
@@ -136,4 +145,32 @@ export interface AdminUser {
   role: GlobalRole;
   is_active: boolean;
   created_at: string;
+}
+
+export interface Retention {
+  reviews: number;
+  remembered: number;
+}
+
+export interface CardStates {
+  new: number;
+  learning: number;
+  young: number;
+  mature: number;
+}
+
+export interface Stats {
+  activity: {
+    // Study days (YYYY-MM-DD) in the user's timezone, rolling over at 04:00.
+    today: string;
+    days: { date: string; reviews: number }[];
+    current_streak: number;
+    longest_streak: number;
+    total_reviews: number;
+    days_studied: number;
+  };
+  retention_last_30_days: Retention;
+  retention_by_month: (Retention & { month: string })[];
+  states: CardStates;
+  decks: { deck_id: string; name: string; states: CardStates; retention: Retention }[];
 }

@@ -12,6 +12,7 @@ const USERNAMES = {
   student: "kofi",
   owner: "lucia",
   friend: "tomas",
+  importer: "sami",
 } as const;
 
 function secret(): string {

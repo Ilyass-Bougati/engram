@@ -1,6 +1,6 @@
 # Engram deck format, version 1
 
-A deck file is one JSON document, UTF-8 encoded. Exporting a deck produces this format, and importing accepts it. An import can either create a new deck or add the cards to an existing one; adding to an existing deck ignores `deck`. A complete example is in [`example-deck.json`](example-deck.json).
+A deck file is one JSON document, UTF-8 encoded. Exporting a deck produces this format, and importing accepts it. An import can either create a new deck or add the cards to an existing one; adding to an existing deck ignores `deck`. A complete example is in [`example-deck.json`](example-deck.json). Anki packages are imported separately; see [Importing from Anki](anki-import.md).
 
 Exported files include quiz answer keys. Anyone who receives one can see the answers.
 

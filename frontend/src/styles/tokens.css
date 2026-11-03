@@ -34,6 +34,14 @@
   --rating-good: light-dark(#285f45, #7db592);
   --rating-easy: light-dark(#3a5a78, #93b3d1);
 
+  /* Data: one pine ramp for magnitude and for the new → mature progression. Checked as an
+     ordinal ramp (one hue, monotone lightness, light end at least 2:1 on the surface); dark
+     mode runs from near the surface to bright instead of flipping the light values. */
+  --chart-1: light-dark(#8fbc9f, #3d6b50);
+  --chart-2: light-dark(#5f9a78, #5a8f6f);
+  --chart-3: light-dark(#3a7656, #7db592);
+  --chart-4: light-dark(#1f4d37, #b0dcbf);
+
   /*
    * Glass: only for the review card, the top navigation, and dialogs/popovers. Fairly opaque
    * fill, strong blur, one edge (a border), no shadow.

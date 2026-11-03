@@ -2,9 +2,11 @@ from fastapi import APIRouter, HTTPException, Response, status
 
 from app.db import SessionDep
 from app.deps import CurrentUser
+from app.models import utcnow
 from app.routers.auth import revoke_all_user_tokens, start_session
 from app.schemas import Password, SessionResponse, StrictModel, Timezone, UserPublic
 from app.security import hash_password, verify_password
+from app.stats import Stats, user_stats
 
 router = APIRouter(prefix="/me", tags=["me"])
 
@@ -44,3 +46,8 @@ def change_password(
     session.add(user)
     # Every other session ends; this one continues with a fresh token pair.
     return start_session(session, user, response)
+
+
+@router.get("/stats")
+def get_my_stats(user: CurrentUser, session: SessionDep) -> Stats:
+    return user_stats(session, user, utcnow())

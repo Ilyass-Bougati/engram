@@ -19,7 +19,7 @@
 
 Going over the limit returns `429` with `Retry-After`. The counters live in process memory. That is why the backend runs as one uvicorn worker and one replica: a second process would get its own counters. Behind a proxy, the per-IP limits need `FORWARDED_ALLOW_IPS` (see [configuration](configuration.md#proxies-and-client-ips)).
 
-Request bodies are capped at 2 MiB. A proxy in front may cap lower, never higher.
+Request bodies are capped at 2 MiB, except the Anki import at 64 MiB. A proxy in front may cap lower, never higher.
 
 ## Access rules
 
@@ -41,6 +41,15 @@ Cards are Markdown with math and code. The client never renders raw HTML. Its pi
 2. Sanitize against an allowlist. Links may use `http`, `https` and `mailto` only.
 3. Render math (KaTeX with `trust: false`) and highlight code on the sanitized tree.
 4. Output React elements. Nothing is set through `innerHTML`.
+
+## Anki uploads
+
+An Anki import uploads a SQLite database, which is untrusted input:
+
+- The body is streamed to a private temporary directory, never held in memory, and removed after the import.
+- Gzip is inflated with a 256 MiB cap, so a small compressed bomb can't fill the disk.
+- The database is opened read-only, with `trusted_schema=OFF` and `query_only=ON`, so schema tricks such as triggers or views calling functions don't run. Only Anki's known tables are read.
+- Card HTML is converted to Markdown by a parser, not copied, and then goes through the same rendering pipeline as any card. Links other than `http`, `https` and `mailto` are dropped.
 
 ## Containers
 

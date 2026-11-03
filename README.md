@@ -7,6 +7,8 @@ This file covers deployment only. Everything else is in [`docs/`](docs):
 - [Configuration](docs/configuration.md): environment variables
 - [Admin CLI](docs/admin-cli.md): creating admins, resetting passwords
 - [Deck format](docs/deck-format.md): the JSON import/export format
+- [Importing from Anki](docs/anki-import.md): what an `.apkg` import keeps and drops
+- [Stats](docs/stats.md): how streaks, retention and card states are counted
 - [Security](docs/security.md): sessions, rate limits, access rules, proxies
 - [Development](docs/development.md): running the checks and the end-to-end tests
 

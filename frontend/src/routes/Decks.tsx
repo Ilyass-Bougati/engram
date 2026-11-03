@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronRightIcon } from "lucide-react";
+import { ChevronDownIcon, ChevronRightIcon } from "lucide-react";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router";
 
@@ -15,6 +15,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -23,6 +29,7 @@ import { formText, readJsonFile } from "@/lib/form";
 import { plural, studyCountsText } from "@/lib/format";
 import type { Deck } from "@/lib/types";
 import { useFilePicker } from "@/lib/useFilePicker";
+import { AnkiImportDialog } from "@/routes/decks/AnkiImportDialog";
 
 function NewDeckDialog({
   open,
@@ -131,7 +138,7 @@ function DeckRow({ deck }: { deck: Deck }) {
 export function DecksPage() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
-  const [creating, setCreating] = useState(false);
+  const [dialog, setDialog] = useState<"new" | "anki" | null>(null);
   const decks = useQuery({ queryKey: ["decks"], queryFn: () => api<Deck[]>("/decks") });
   const importDeck = useMutation({
     mutationFn: async (file: File) =>
@@ -147,12 +154,27 @@ export function DecksPage() {
 
   const actions = (
     <>
-      <Button variant="secondary" onClick={picker.open} disabled={importDeck.isPending}>
-        {importDeck.isPending ? "Importing…" : "Import deck"}
-      </Button>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="secondary" disabled={importDeck.isPending}>
+            {importDeck.isPending ? "Importing…" : "Import"}
+            <ChevronDownIcon aria-hidden />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem onSelect={picker.open}>Engram deck (.json)</DropdownMenuItem>
+          <DropdownMenuItem
+            onSelect={() => {
+              setDialog("anki");
+            }}
+          >
+            Anki package (.apkg)
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
       <Button
         onClick={() => {
-          setCreating(true);
+          setDialog("new");
         }}
       >
         New deck
@@ -173,7 +195,7 @@ export function DecksPage() {
       ) : decks.data.length === 0 ? (
         <EmptyState title="No decks yet">
           <p className="text-sm text-muted-foreground">
-            Create a deck and add cards, or import a JSON deck file (see docs/deck-format.md).
+            Create a deck and add cards, or import one from Anki or a JSON deck file.
           </p>
         </EmptyState>
       ) : (
@@ -183,7 +205,18 @@ export function DecksPage() {
           ))}
         </ul>
       )}
-      <NewDeckDialog open={creating} onOpenChange={setCreating} />
+      <NewDeckDialog
+        open={dialog === "new"}
+        onOpenChange={(open) => {
+          setDialog(open ? "new" : null);
+        }}
+      />
+      <AnkiImportDialog
+        open={dialog === "anki"}
+        onOpenChange={(open) => {
+          setDialog(open ? "anki" : null);
+        }}
+      />
     </div>
   );
 }

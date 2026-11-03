@@ -57,6 +57,15 @@ The run needs Docker and two free ports, 6768 and 6970. It doesn't touch a stack
 
 The `screens` project also writes full-page screenshots of every screen to `frontend/screenshots/`.
 
+### Anki fixtures
+
+The Anki import tests use collections made by the real Anki library: `backend/tests/fixtures/anki-*.sqlite.gz`, and `frontend/e2e/fixtures/geography.apkg` for the browser side. The tests don't need Anki installed. To rebuild the fixtures after changing what they cover:
+
+```bash
+cd backend
+uv run --no-project --python 3.12 --with anki --with zstandard python tests/fixtures/make_anki_fixtures.py tests/fixtures ../frontend/e2e/fixtures
+```
+
 ## Releases
 
 [`.github/workflows/release.yml`](../.github/workflows/release.yml) runs when a `v*.*.*` tag is pushed:

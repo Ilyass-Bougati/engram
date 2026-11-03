@@ -1,5 +1,6 @@
 import secrets
 import uuid
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from zoneinfo import ZoneInfo
@@ -140,6 +141,27 @@ def apply_rating(session: Session, state: ReviewState, rating: fsrs.Rating, now:
         ReviewLog(
             user_id=state.user_id, card_id=state.card_id, rating=rating.value, reviewed_at=now
         )
+    )
+
+
+def replayed_review_state(
+    user_id: uuid.UUID, card_id: uuid.UUID, reviews: Sequence[tuple[datetime, int]]
+) -> ReviewState:
+    # Answers given in another app (Anki), replayed in order so the card ends up where FSRS
+    # would have scheduled it. `reviews` is non-empty: (when, rating 1-4).
+    card = fsrs.Card(due=reviews[0][0])
+    for reviewed_at, rating in reviews:
+        card, _ = scheduler.review_card(card, fsrs.Rating(rating), review_datetime=reviewed_at)
+    return ReviewState(
+        user_id=user_id,
+        card_id=card_id,
+        state=card.state.value,
+        step=card.step,
+        stability=card.stability,
+        difficulty=card.difficulty,
+        due=card.due,
+        last_review=card.last_review,
+        introduced_at=reviews[0][0],
     )
 
 

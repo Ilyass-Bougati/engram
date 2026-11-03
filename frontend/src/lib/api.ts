@@ -90,12 +90,16 @@ export async function apiResponse(path: string, options: RequestOptions = {}): P
   const attempt = () => {
     const headers: Record<string, string> = csrf ? { ...CSRF_HEADER } : {};
     if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
-    if (body !== undefined) headers["Content-Type"] = "application/json";
-    return fetchOrExplain(`/api${path}`, {
-      method,
-      headers,
-      body: body === undefined ? null : JSON.stringify(body),
-    });
+    let payload: BodyInit | null = null;
+    if (body instanceof Blob) {
+      // Files go up as they are (the Anki import), everything else as JSON.
+      headers["Content-Type"] = body.type || "application/octet-stream";
+      payload = body;
+    } else if (body !== undefined) {
+      headers["Content-Type"] = "application/json";
+      payload = JSON.stringify(body);
+    }
+    return fetchOrExplain(`/api${path}`, { method, headers, body: payload });
   };
   let response = await attempt();
   if (response.status === 401 && accessToken !== null) {

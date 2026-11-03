@@ -1,19 +1,26 @@
 import re
+import tempfile
 import uuid
+import zlib
 from collections.abc import Sequence
 from datetime import datetime
-from typing import Annotated
+from pathlib import Path
+from typing import Annotated, Any
 
-from fastapi import APIRouter, Response, status
+import anyio
+from fastapi import APIRouter, HTTPException, Query, Request, Response, status
+from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel, Field, StringConstraints
+from sqlalchemy import insert
 from sqlmodel import Session, col, func, select
 
+from app.anki import AnkiFormatError, Conversion, convert_collection
 from app.cards import CardDetails, add_cards
 from app.db import SessionDep
 from app.deck_format import DeckFile, DeckMeta
 from app.deps import CurrentUser, DeckAccess, EditorAccess, OwnerAccess, ViewerAccess
-from app.models import Card, Deck, DeckMember, DeckRole, User, utcnow
-from app.scheduling import study_counts
+from app.models import Card, Deck, DeckMember, DeckRole, ReviewLog, User, utcnow
+from app.scheduling import replayed_review_state, study_counts
 from app.schemas import StrictModel
 
 router = APIRouter(prefix="/decks", tags=["decks"])
@@ -97,6 +104,119 @@ def import_new_deck(body: DeckFile, user: CurrentUser, session: SessionDep) -> D
     add_cards(session, deck.id, body.cards)
     session.commit()
     return _deck_views(session, user, [(deck, member)])[0]
+
+
+ANKI_IMPORT_PATH = "/api/decks/import/anki"
+MAX_ANKI_UPLOAD_BYTES = 64 * 1024 * 1024
+MAX_ANKI_COLLECTION_BYTES = 256 * 1024 * 1024
+GZIP_MAGIC = b"\x1f\x8b"
+
+
+class AnkiImportResult(BaseModel):
+    deck: DeckView
+    imported: int
+    # Cards left out because a side was empty without its media, or too long.
+    skipped: int
+    # Imported cards that lost an image or a sound.
+    media_removed: int
+    # Anki answers replayed into the importer's schedule; 0 unless progress was kept.
+    reviews_imported: int
+
+
+def _unpack_collection(upload: Path, collection: Path) -> None:
+    # The body is the SQLite collection, gzipped or not. Inflating is capped, so a small
+    # upload can't unpack into an unbounded file.
+    with upload.open("rb") as source:
+        gzipped = source.read(2) == GZIP_MAGIC
+    if not gzipped:
+        upload.rename(collection)
+        return
+    inflater = zlib.decompressobj(wbits=31)
+    written = 0
+    try:
+        with upload.open("rb") as source, collection.open("wb") as target:
+            while chunk := source.read(1 << 20):
+                while chunk:
+                    data = inflater.decompress(chunk, 1 << 20)
+                    written += len(data)
+                    if written > MAX_ANKI_COLLECTION_BYTES:
+                        raise AnkiFormatError(
+                            "The Anki collection is larger than 256 MiB once unpacked."
+                        )
+                    target.write(data)
+                    chunk = inflater.unconsumed_tail
+            target.write(inflater.flush())
+    except zlib.error as error:
+        raise AnkiFormatError("The upload is damaged: it isn't valid gzip.") from error
+    if not inflater.eof:
+        raise AnkiFormatError("The upload is incomplete. Try importing the file again.")
+
+
+def _read_anki_upload(directory: Path, *, keep_progress: bool) -> Conversion:
+    collection = directory / "collection"
+    _unpack_collection(directory / "upload", collection)
+    return convert_collection(collection, keep_reviews=keep_progress)
+
+
+def _store_anki_deck(
+    session: Session, user: User, conversion: Conversion, *, keep_progress: bool, file_name: str
+) -> AnkiImportResult:
+    name = conversion.deck_name or file_name.strip() or "Imported from Anki"
+    deck, member = _create_owned_deck(session, user, DeckMeta(name=name[:200]))
+    cards = add_cards(session, deck.id, [card.data for card in conversion.cards])
+    logs: list[dict[str, Any]] = []
+    if keep_progress:
+        for card, imported in zip(cards, conversion.cards, strict=True):
+            if not imported.reviews:
+                continue
+            session.add(replayed_review_state(user.id, card.id, imported.reviews))
+            logs += [
+                {"user_id": user.id, "card_id": card.id, "rating": rating, "reviewed_at": at}
+                for at, rating in imported.reviews
+            ]
+        if logs:
+            # Bulk insert: a long Anki history is hundreds of thousands of rows.
+            session.connection().execute(insert(ReviewLog), logs)
+    session.commit()
+    return AnkiImportResult(
+        deck=_deck_views(session, user, [(deck, member)])[0],
+        imported=len(cards),
+        skipped=conversion.skipped,
+        media_removed=conversion.media_removed,
+        reviews_imported=len(logs),
+    )
+
+
+@router.post("/import/anki", status_code=status.HTTP_201_CREATED)
+async def import_anki_deck(
+    request: Request,
+    user: CurrentUser,
+    session: SessionDep,
+    keep_progress: bool = False,
+    name: Annotated[str, Query(max_length=200)] = "",
+) -> AnkiImportResult:
+    # The body is the collection from an .apkg (the browser extracts it), not JSON. It's
+    # streamed to disk rather than held in memory.
+    with tempfile.TemporaryDirectory(prefix="engram-anki-") as directory:
+        received = 0
+        async with await anyio.open_file(Path(directory, "upload"), "wb") as upload:
+            async for chunk in request.stream():
+                received += len(chunk)
+                if received > MAX_ANKI_UPLOAD_BYTES:
+                    raise HTTPException(
+                        status.HTTP_413_CONTENT_TOO_LARGE,
+                        "The Anki collection is larger than 64 MiB.",
+                    )
+                await upload.write(chunk)
+        try:
+            conversion = await run_in_threadpool(
+                _read_anki_upload, Path(directory), keep_progress=keep_progress
+            )
+        except AnkiFormatError as error:
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(error)) from error
+    return await run_in_threadpool(
+        _store_anki_deck, session, user, conversion, keep_progress=keep_progress, file_name=name
+    )
 
 
 @router.get("/{deck_id}")

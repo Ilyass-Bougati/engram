@@ -17,7 +17,7 @@ export interface TestUser {
 export interface StackState {
   secrets: { POSTGRES_PASSWORD: string; JWT_SECRET: string };
   admin: TestUser;
-  users: Record<"reader" | "author" | "student" | "owner" | "friend", TestUser>;
+  users: Record<"reader" | "author" | "student" | "owner" | "friend" | "importer", TestUser>;
 }
 
 export function readStack(): StackState {

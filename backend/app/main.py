@@ -8,9 +8,17 @@ from app.db import SessionDep
 from app.deps import PUBLIC
 from app.models import CardKind
 from app.routers import admin, auth, cards, decks, invites, me, members, reviews
+from app.routers.decks import ANKI_IMPORT_PATH, MAX_ANKI_UPLOAD_BYTES
 
-# Deck imports are the largest legitimate bodies. A proxy in front may cap lower, never higher.
+# JSON deck imports are the largest ordinary bodies. A proxy in front may cap lower, never higher.
 MAX_BODY_BYTES = 2 * 1024 * 1024
+LARGER_BODIES = {
+    # The browser uploads only the collection from an .apkg, gzipped; media stays behind.
+    ANKI_IMPORT_PATH: (
+        MAX_ANKI_UPLOAD_BYTES,
+        "The Anki collection is larger than 64 MiB. Export smaller subdecks from Anki.",
+    ),
+}
 
 
 class BodySizeLimit:
@@ -27,11 +35,16 @@ class BodySizeLimit:
             if length is None:
                 if headers.get(b"transfer-encoding"):
                     problem = (status.HTTP_411_LENGTH_REQUIRED, "Send a Content-Length header.")
-            elif not length.isdigit() or int(length) > MAX_BODY_BYTES:
-                problem = (
-                    status.HTTP_413_CONTENT_TOO_LARGE,
-                    "The request body is larger than 2 MiB. Split the deck into smaller files.",
+            else:
+                limit, message = LARGER_BODIES.get(
+                    scope["path"],
+                    (
+                        MAX_BODY_BYTES,
+                        "The request body is larger than 2 MiB. Split the deck into smaller files.",
+                    ),
                 )
+                if not length.isdigit() or int(length) > limit:
+                    problem = (status.HTTP_413_CONTENT_TOO_LARGE, message)
             if problem:
                 response = JSONResponse({"detail": problem[1]}, problem[0])
                 await response(scope, receive, send)

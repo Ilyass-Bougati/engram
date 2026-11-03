@@ -58,6 +58,11 @@ export function AppShell({ username, isAdmin, onSignOut, children }: AppShellPro
                   Decks
                 </NavLink>
               </li>
+              <li>
+                <NavLink to="/stats" className={navLinkClass}>
+                  Stats
+                </NavLink>
+              </li>
               {isAdmin && (
                 <li>
                   <NavLink to="/admin/invites" className={navLinkClass}>
