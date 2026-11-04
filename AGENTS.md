@@ -12,6 +12,7 @@ Engram is a self-hosted spaced-repetition flashcard app for a handful of users. 
 | `frontend/` | React 19, Vite, TypeScript strict, Tailwind v4, shadcn, TanStack Query, React Router |
 | `frontend/src/styles/tokens.css` | Every color, radius, shadow, duration and glass value |
 | `frontend/e2e/` | Playwright, run against its own Compose stack |
+| `mobile/` | Flutter app for Android and iOS: a study companion on the same API. See [docs/mobile.md](docs/mobile.md) |
 | `docs/openapi.json` | The API reference, generated from the routes |
 | `Dockerfile` | One image: builds the web app, then the backend serves it |
 | `deploy/k8s/` | Kustomize manifests |
@@ -36,6 +37,13 @@ npm run typecheck
 npm test
 npm run build
 npm run e2e              # needs Docker and port 6768; see docs/development.md
+```
+
+```bash
+cd mobile
+flutter analyze
+dart format --output=none --set-exit-if-changed .
+flutter test
 ```
 
 The end-to-end run uses its own Compose project, `engram-e2e`, and removes it afterwards. Never stop, rebuild or wipe the Compose stack or k3s deployment someone already has running.
@@ -71,6 +79,13 @@ The end-to-end run uses its own Compose project, `engram-e2e`, and removes it af
 - Icons come from `lucide-react`, with `aria-hidden` next to a visible label, or an `aria-label` when there isn't one.
 - Every screen has loading, empty and error states.
 - The production page runs under a strict Content Security Policy (`backend/app/web.py`): no inline scripts, no third-party origins. The end-to-end tests fail on any CSP violation.
+
+### Mobile
+
+- Card text goes through `CardMarkdown` (`mobile/lib/widgets/card_markdown.dart`), with the web's rules: raw HTML dropped, links opened only for http, https and mailto, images from https only.
+- Colors, radii, motion and glass come from `mobile/lib/theme.dart`, which mirrors `tokens.css`; no raw colors in screens. Glass (`Glass` in `widgets/glass.dart`) only on the top bar, menus, sheets and the review card.
+- The refresh token lives only in `TokenStore` (the OS keystore) and goes only to the server it came from. Refreshes stay single-flight.
+- When a route the app uses changes, update `mobile/lib/api/models.dart` along with `frontend/src/lib/types.ts`.
 
 ### Releases
 

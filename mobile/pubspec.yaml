@@ -1,0 +1,41 @@
+name: engram_mobile
+description: "Engram for Android and iOS: study your decks on the go."
+publish_to: 'none'
+version: 0.1.0+1
+
+environment:
+  sdk: ^3.13.7
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_highlight: ^0.7.0
+  flutter_markdown_plus: ^1.0.12
+  flutter_math_fork: ^0.7.4
+  flutter_secure_storage: ^11.2.0
+  flutter_timezone: ^5.1.1
+  http: ^1.6.0
+  intl: ^0.20.3
+  markdown: ^7.3.1
+  shared_preferences: ^2.5.6
+  url_launcher: ^6.3.3
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/fonts/OFL-IBMPlexSans.txt
+    - assets/fonts/OFL-IBMPlexMono.txt
+  fonts:
+    - family: IBM Plex Sans
+      fonts:
+        - asset: assets/fonts/IBMPlexSans.ttf
+    - family: IBM Plex Mono
+      fonts:
+        - asset: assets/fonts/IBMPlexMono-Regular.ttf
+        - asset: assets/fonts/IBMPlexMono-Medium.ttf
+          weight: 500
