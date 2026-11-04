@@ -95,8 +95,8 @@ class _Root extends StatelessWidget {
                 children: [
                   FilledButton(onPressed: session.restore, child: const Text('Try again')),
                   OutlinedButton(
-                    onPressed: session.changeServer,
-                    child: const Text('Change server'),
+                    onPressed: () => openServerPicker(context, session),
+                    child: const Text('Switch server'),
                   ),
                 ],
               ),

@@ -5,6 +5,7 @@ import '../auth/session.dart';
 import '../widgets/form_page.dart';
 import '../widgets/states.dart';
 import 'invite_screen.dart';
+import 'server_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key, required this.session});
@@ -59,7 +60,10 @@ class _LoginScreenState extends State<LoginScreen> {
             ).push(MaterialPageRoute<void>(builder: (_) => InviteScreen(session: widget.session))),
             child: const Text('I have an invite'),
           ),
-          TextButton(onPressed: widget.session.changeServer, child: const Text('Change server')),
+          TextButton(
+            onPressed: () => openServerPicker(context, widget.session),
+            child: const Text('Switch server'),
+          ),
         ],
       ),
       children: [

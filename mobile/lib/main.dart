@@ -18,7 +18,7 @@ Future<void> main() async {
     }
   });
   final preferences = await Preferences.load();
-  final session = SessionController(preferences: preferences, tokens: const SecureTokenStore());
+  final session = SessionController(preferences: preferences, tokensFor: SecureTokenStore.new);
   runApp(EngramApp(session: session, preferences: preferences));
   await session.start();
 }

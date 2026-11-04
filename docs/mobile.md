@@ -12,18 +12,23 @@
 
 It talks to the same API as the web app, and the backend needed no changes for it.
 
-## Connecting to a server
+## Choosing a server
 
 On first launch the app asks for the server's address, the one you open Engram at in a browser, such as `https://engram.example.com`. It checks `/api/health` before saving it. An address without a scheme gets `https://`.
 
-Plain `http://` is refused, except for `localhost`, `127.x` and `10.0.2.2` (the Android emulator's address for the machine it runs on). That is for development only: Android release builds only allow https, and debug builds allow cleartext to those hosts and nothing else. Changing the server signs you out of the old one first, so a token is never sent to a different server.
+To switch later, use **Switch server** in Settings, or on the sign-in screen. The picker lists every server used on the device, most recent first, and takes new addresses too.
+
+- **Each server keeps its own sign-in.** Switching back to a server you're signed in to needs no password. Every server's refresh token is stored separately and only ever sent to the server that issued it.
+- **Forgetting a server** (the bin icon) signs you out of it and takes it off the list. If it was the one in use, the app goes back to the picker.
+
+Plain `http://` is refused, except for `localhost`, `127.x` and `10.0.2.2` (the Android emulator's address for the machine it runs on). That is for development only: Android release builds only allow https, and debug builds allow cleartext to those hosts and nothing else.
 
 ## Sessions
 
 The app follows the same rules as the web client (see [security](security.md#sessions)):
 
 - The **access token** is kept in memory only and sent as `Authorization: Bearer`. On a 401 the app refreshes once and retries.
-- The **refresh token** is the `engram_refresh` cookie. The app reads it from `Set-Cookie` at sign-in, sign-up, refresh and password change, and sends it back as a `Cookie` header with `X-Engram-CSRF: 1`. Between launches it is kept in the OS keystore: the Keychain on iOS (this device only, after first unlock), and Keystore-backed storage on Android, with app backups and device transfer turned off.
+- The **refresh token** is the `engram_refresh` cookie. The app reads it from `Set-Cookie` at sign-in, sign-up, refresh and password change, and sends it back as a `Cookie` header with `X-Engram-CSRF: 1`. Between launches it is kept in the OS keystore, one entry per server: the Keychain on iOS (this device only, after first unlock), and Keystore-backed storage on Android, with app backups and device transfer turned off.
 - **Refreshes never overlap.** Each refresh rotates the token, and presenting a rotated one ends the whole sign-in as suspected theft. So concurrent requests that hit a 401 share one refresh.
 - **Signing out** revokes the token chain on the server and deletes the stored token. Offline, the token is deleted on the phone anyway.
 
@@ -69,7 +74,45 @@ flutter build apk --release      # Android
 flutter build ipa                # iOS, on a Mac with Xcode and a signing team
 ```
 
-The Android release build is signed with the debug key until a release keystore is configured in `android/app/build.gradle.kts`. The app ID is `dev.engram.engram_mobile` on both platforms.
+An Android release build is signed with the key that `android/key.properties` points to (`storeFile`, `storePassword`, `keyAlias`, `keyPassword`). Without that file it falls back to the debug key, which is fine for trying a release build but not for sharing one. `key.properties` and keystores are gitignored. The app ID is `dev.engram.engram_mobile` on both platforms.
+
+## Releases
+
+[`.github/workflows/mobile.yml`](../.github/workflows/mobile.yml) runs the checks above on every pull request and push to `main` that touches `mobile/`. To publish a release, set `version` in `mobile/pubspec.yaml` (the part before `+`), commit, and push a matching tag:
+
+```bash
+git tag mobile-v0.2.0
+git push origin mobile-v0.2.0
+```
+
+The workflow then:
+
+1. Runs the checks.
+2. Fails if the tag and the pubspec version disagree.
+3. Builds the Android APK and App Bundle, signed with your upload key. The build number (Android's `versionCode`) is the workflow's run number, so each release installs over the last.
+4. Publishes a GitHub release named after the tag with `engram-<version>.apk`, `engram-<version>.aab` and `SHA256SUMS`. People install the APK on their phones; the App Bundle is what Google Play takes, if you publish there.
+5. Builds the iOS app without signing, to check it still compiles. Shipping to iPhones needs an Apple developer account and isn't automated.
+
+Mobile tags are separate from the server's `v*` tags, so the app and the server are released independently.
+
+### The upload key
+
+Android only installs an update signed with the same key as the installed app, so create one key and keep it. Losing it means everyone reinstalls.
+
+```bash
+keytool -genkeypair -v -keystore engram-upload.jks -storetype PKCS12 -keyalg RSA -keysize 2048 -validity 10000 -alias upload
+```
+
+Keep `engram-upload.jks` and its password somewhere safe, such as a password manager, outside the repository. Then add four repository secrets (Settings → Secrets and variables → Actions):
+
+| Secret | Value |
+|---|---|
+| `ANDROID_KEYSTORE_BASE64` | the output of `base64 -w0 engram-upload.jks` |
+| `ANDROID_KEYSTORE_PASSWORD` | the keystore password |
+| `ANDROID_KEY_ALIAS` | `upload` |
+| `ANDROID_KEY_PASSWORD` | the key password (the same as the keystore password for a PKCS12 keystore) |
+
+Without them, the release job stops with an error instead of publishing a debug-signed build.
 
 ### When the API changes
 

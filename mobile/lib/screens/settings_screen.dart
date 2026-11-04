@@ -8,6 +8,7 @@ import '../theme.dart';
 import '../widgets/glass.dart';
 import '../widgets/states.dart';
 import 'home_shell.dart';
+import 'server_screen.dart';
 
 /// Theme, timezone, password and server: the web app's Settings page.
 class SettingsScreen extends StatelessWidget {
@@ -51,14 +52,24 @@ class SettingsScreen extends StatelessWidget {
             _Section(
               icon: Icons.dns_outlined,
               title: 'Server',
-              description: session.server?.toString() ?? '',
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: OutlinedButton.icon(
-                  onPressed: () => _confirmSignOut(context),
-                  icon: const Icon(Icons.logout),
-                  label: const Text('Sign out'),
-                ),
+              description:
+                  'Connected to ${session.server}. Each server keeps its own sign-in on this '
+                  'device, so you can switch back and forth.',
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  FilledButton.icon(
+                    onPressed: () => openServerPicker(context, session),
+                    icon: const Icon(Icons.swap_horiz),
+                    label: const Text('Switch server'),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: () => _confirmSignOut(context),
+                    icon: const Icon(Icons.logout),
+                    label: const Text('Sign out'),
+                  ),
+                ],
               ),
             ),
           ],
@@ -78,7 +89,7 @@ class SettingsScreen extends StatelessWidget {
           const Text('Sign out?', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
           const SizedBox(height: 8),
           Text(
-            'This device forgets your session. Your progress is saved on the server.',
+            'This device forgets your session on ${session.server?.host}. Your progress is saved on the server.',
             style: TextStyle(color: sheet.colors.inkMuted),
           ),
           const SizedBox(height: 24),
