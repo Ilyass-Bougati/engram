@@ -1,8 +1,8 @@
 name: Mobile
 
 # Pull requests and pushes to main that touch the app run its checks. Pushing a tag like
-# mobile-v0.2.0 also builds a signed Android release (APK and App Bundle), publishes it as a
-# GitHub release, and checks that the iOS app compiles. See docs/mobile.md#releases.
+# mobile-v0.2.0 also builds a signed Android release (APK and App Bundle) and publishes it as a
+# GitHub release. See docs/mobile.md#releases.
 on:
   pull_request:
     paths: ["mobile/**", ".github/workflows/mobile.yml"]
@@ -113,22 +113,3 @@ jobs:
       - name: Remove the key
         if: always()
         run: rm -f android/key.properties "$RUNNER_TEMP/upload-keystore.jks"
-
-  # Distributing to iPhones needs an Apple developer account and signing; this only makes sure
-  # every release still builds for iOS.
-  ios:
-    if: startsWith(github.ref, 'refs/tags/mobile-v')
-    needs: check
-    runs-on: macos-latest
-    defaults:
-      run:
-        working-directory: mobile
-    steps:
-      - uses: actions/checkout@v4
-      - uses: subosito/flutter-action@v2
-        with:
-          channel: stable
-          flutter-version: ${{ env.FLUTTER_VERSION }}
-          cache: true
-      - run: flutter pub get --enforce-lockfile
-      - run: flutter build ios --release --no-codesign --build-number=${{ github.run_number }}

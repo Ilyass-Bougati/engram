@@ -51,6 +51,19 @@ The app uses the web app's design tokens, ported to [`theme.dart`](../mobile/lib
 
 When a token changes in `frontend/src/styles/tokens.css`, change it in `theme.dart` too.
 
+### App icon
+
+The icon is the web app's mark ([`favicon.svg`](../frontend/public/favicon.svg)) on the paper color. It comes in three forms:
+
+- **Android 8 and later:** an adaptive icon made of vectors, in `android/app/src/main/res/mipmap-anydpi-v26` and `drawable/ic_launcher_*.xml`. Launchers that follow dark mode show the favicon's dark colors. Android 13 themed icons use a one-color version.
+- **iOS, and older Android:** PNGs drawn with the same painter as the in-app mark (`paintEngramMark`). After changing the mark, regenerate them and commit the result:
+
+  ```bash
+  flutter test tool/generate_icons_test.dart
+  ```
+
+  The vector icon has its own copy of the geometry, so change it there too.
+
 ## Development
 
 Requirements: Flutter (stable), and the Android SDK or Xcode for running on a device.
@@ -91,7 +104,8 @@ The workflow then:
 2. Fails if the tag and the pubspec version disagree.
 3. Builds the Android APK and App Bundle, signed with your upload key. The build number (Android's `versionCode`) is the workflow's run number, so each release installs over the last.
 4. Publishes a GitHub release named after the tag with `engram-<version>.apk`, `engram-<version>.aab` and `SHA256SUMS`. People install the APK on their phones; the App Bundle is what Google Play takes, if you publish there.
-5. Builds the iOS app without signing, to check it still compiles. Shipping to iPhones needs an Apple developer account and isn't automated.
+
+iOS isn't built in CI. Build it on a Mac with `flutter build ipa`; shipping to iPhones needs an Apple developer account.
 
 Mobile tags are separate from the server's `v*` tags, so the app and the server are released independently.
 
