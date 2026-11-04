@@ -1,4 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="paper">#141517</color>
+    <!-- favicon.svg's dark colors. -->
+    <color name="ic_launcher_background">#141517</color>
+    <color name="mark_front">#7DB592</color>
+    <color name="mark_back_fill">#243429</color>
+    <color name="mark_back_stroke">#7DB592</color>
 </resources>

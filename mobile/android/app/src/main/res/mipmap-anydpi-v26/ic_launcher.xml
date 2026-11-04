@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 8+: the web app's mark (frontend/public/favicon.svg) as vectors over the paper color.
+     Colors come from values/ and values-night/, so launchers that follow dark mode show the
+     favicon's dark scheme. Older versions use the PNGs from tool/generate_icons_test.dart. -->
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@color/ic_launcher_background" />
+    <foreground android:drawable="@drawable/ic_launcher_foreground" />
+    <monochrome android:drawable="@drawable/ic_launcher_monochrome" />
+</adaptive-icon>

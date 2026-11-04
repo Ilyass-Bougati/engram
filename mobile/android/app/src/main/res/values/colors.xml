@@ -2,4 +2,9 @@
 <resources>
     <!-- The paper-top token from frontend/src/styles/tokens.css, behind the app while it starts. -->
     <color name="paper">#F4F2EE</color>
+    <!-- The launcher icon: paper, and the mark in favicon.svg's light colors. -->
+    <color name="ic_launcher_background">#F4F2EE</color>
+    <color name="mark_front">#285F45</color>
+    <color name="mark_back_fill">#E2EDE6</color>
+    <color name="mark_back_stroke">#285F45</color>
 </resources>
