@@ -8,6 +8,7 @@
 - **CSRF:** `POST /api/auth/refresh` and `/api/auth/logout` require the header `X-Engram-CSRF: 1`. No CORS is configured, so a page on another site can't send it.
 - **Passwords** are hashed with Argon2. Login gives the same answer, in about the same time, for an unknown user, a wrong password and a deactivated account.
 - **Invite and refresh tokens** are 32 random bytes, stored as SHA-256 hashes.
+- **The mobile app** has no cookie jar, so it reads the refresh cookie from `Set-Cookie` and sends it back itself, with the CSRF header. It keeps the token in the Keychain or Android Keystore, never in backups, and talks to the server over https only. See [mobile](mobile.md#sessions).
 
 ## Rate limits
 

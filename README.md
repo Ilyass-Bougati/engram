@@ -12,6 +12,7 @@ This file covers deployment only. Everything else is in [`docs/`](docs):
 - [Security](docs/security.md): sessions, rate limits, access rules, proxies
 - [API](docs/api.md): scripting against the API, and its OpenAPI reference
 - [Development](docs/development.md): running the checks and the end-to-end tests
+- [Mobile app](docs/mobile.md): the Flutter app for Android and iOS
 
 Engram ships as one image, `ghcr.io/l03x/engram`. The backend serves the web app and the API (`/api`) from the same origin, which the refresh cookie and the CSRF header rely on. Next to it runs Postgres.
 

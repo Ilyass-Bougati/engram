@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The paper-top token from frontend/src/styles/tokens.css, behind the app while it starts. -->
+    <color name="paper">#F4F2EE</color>
+</resources>
