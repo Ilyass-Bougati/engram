@@ -1,6 +1,6 @@
 # API
 
-The web app is the API's only client, but nothing stops you scripting against it. The full reference is [`openapi.json`](openapi.json), an OpenAPI 3.1 file covering every route, request body, response and error. Open it in any OpenAPI viewer, or read it as it is.
+The web app and the [mobile app](mobile.md) are the API's clients, and nothing stops you scripting against it. The full reference is [`openapi.json`](openapi.json), an OpenAPI 3.1 file covering every route, request body, response and error. Open it in any OpenAPI viewer, or read it as it is.
 
 The running server doesn't publish the reference or any interactive docs. They would be the one page anyone could load without signing in that lists every route. The committed file is the reference instead, generated from the code.
 

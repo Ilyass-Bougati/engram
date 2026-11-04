@@ -78,3 +78,5 @@ uv run --no-project --python 3.12 --with anki --with zstandard python tests/fixt
 2. If both pass, the image is built from the root [`Dockerfile`](../Dockerfile) for `linux/amd64` and `linux/arm64` and pushed to `ghcr.io/l03x/engram:<version>`. The web app is built in a first stage on the runner's own platform, since its files are the same for both. The push uses the workflow's own `GITHUB_TOKEN`, so no registry secret is stored.
 
 The tag must equal `v` plus the `version` in `backend/pyproject.toml`, or the run fails before anything is built.
+
+The mobile app has its own workflow and `mobile-v*` tags; see [mobile](mobile.md#releases).
