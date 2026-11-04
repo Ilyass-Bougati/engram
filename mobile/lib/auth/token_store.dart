@@ -1,6 +1,7 @@
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
-/// Where the refresh token is kept between launches.
+/// Where one server's refresh token is kept between launches. Each server has its own store, so
+/// a token only ever goes back to the server that issued it.
 abstract interface class TokenStore {
   Future<String?> read();
   Future<void> write(String token);
@@ -10,12 +11,15 @@ abstract interface class TokenStore {
 /// The OS keystore: the Keychain on iOS, Keystore-backed encryption on Android. The token
 /// stays on this device: it is left out of iCloud and Android backups.
 class SecureTokenStore implements TokenStore {
-  const SecureTokenStore();
+  const SecureTokenStore(this.server);
 
-  static const _key = 'engram_refresh_token';
+  final Uri server;
+
   static const _storage = FlutterSecureStorage(
     iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock_this_device),
   );
+
+  String get _key => 'engram_refresh_token@$server';
 
   @override
   Future<String?> read() => _storage.read(key: _key);
