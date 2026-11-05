@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Release builds strip resources nothing in code refers to; the reminder icon is only named in
+     Dart (lib/reminders/notifier.dart), so keep it. -->
+<resources xmlns:tools="http://schemas.android.com/tools"
+    tools:keep="@drawable/ic_stat_engram" />

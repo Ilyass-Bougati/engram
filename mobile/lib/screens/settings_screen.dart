@@ -4,18 +4,27 @@ import 'package:flutter_timezone/flutter_timezone.dart';
 import '../api/errors.dart';
 import '../auth/session.dart';
 import '../preferences.dart';
+import '../reminders/reminders.dart';
 import '../theme.dart';
 import '../widgets/glass.dart';
 import '../widgets/states.dart';
 import 'home_shell.dart';
 import 'server_screen.dart';
+import 'settings/reminder_settings.dart';
 
-/// Theme, timezone, password and server: the web app's Settings page.
+/// Theme, reminders, timezone, password and server: the web app's Settings page, plus the
+/// phone-only reminders.
 class SettingsScreen extends StatelessWidget {
-  const SettingsScreen({super.key, required this.session, required this.preferences});
+  const SettingsScreen({
+    super.key,
+    required this.session,
+    required this.preferences,
+    required this.reminders,
+  });
 
   final SessionController session;
   final Preferences preferences;
+  final Reminders reminders;
 
   @override
   Widget build(BuildContext context) {
@@ -46,6 +55,14 @@ class SettingsScreen extends StatelessWidget {
                   onSelectionChanged: (selection) => preferences.setThemeMode(selection.single),
                 ),
               ),
+            ),
+            _Section(
+              icon: Icons.notifications_outlined,
+              title: 'Reminders',
+              description:
+                  "A nudge at these times each day, skipped once you've finished the day's "
+                  'reviews.',
+              child: ReminderSettings(reminders: reminders),
             ),
             _TimezoneSection(session: session),
             _PasswordSection(session: session),
