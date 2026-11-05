@@ -3,7 +3,7 @@
   "info": {
     "title": "Engram API",
     "description": "The JSON API behind the Engram web app. The page and the API share one origin, and every\nAPI path starts with `/api`.\n\n## Signing in\n\n1. `POST /api/auth/login` (or redeeming an invite) returns an `access_token` and sets the\n   `engram_refresh` cookie: httpOnly, Secure, SameSite=Lax, `Path=/api/auth`.\n2. Send `Authorization: Bearer <access_token>` with every other request. Access tokens last\n   15 minutes.\n3. On a 401, call `POST /api/auth/refresh` with the cookie and the header\n   `X-Engram-CSRF: 1`, then retry the request once. Each refresh token works once, so run\n   one refresh at a time: presenting a used token signs out every session from that sign-in.\n\nA password change, or an admin deactivating the account, ends every session at once, access\ntokens included.\n\n## Errors\n\nAn error is JSON with a `detail` sentence written to be shown to the user as it is. A 422\nadds `errors`, one `{field, message}` per problem, with paths like `cards[12].options`.\n\n## Decks and roles\n\nEach member of a deck is its owner, an editor or a viewer. A deck you aren't a member of\nanswers 404, exactly like one that doesn't exist. A member whose role is too low gets 403.\n\n## Limits\n\nRequest bodies are capped at 2 MiB (64 MiB for an Anki upload) and need a `Content-Length`\n(411 without one). Sign-in, refresh and invite routes are rate-limited per client IP; a 429\ncarries `Retry-After` in seconds.\n",
-    "version": "0.2.0"
+    "version": "0.3.0"
   },
   "paths": {
     "/api/health": {
