@@ -28,6 +28,12 @@
   --pine: light-dark(#285f45, #7db592);
   --on-pine: light-dark(#ffffff, #10140f);
   --pine-soft: light-dark(#e2ede6, #243429);
+  /* The study suggestion: a slow swirl (ShaderSwirl.tsx) that only ever mixes these three
+     greens, so text on it is covered by checking each one. */
+  --suggestion-1: light-dark(#123f2b, #5f9a78);
+  --suggestion-2: light-dark(#1c5a3e, #7db592);
+  --suggestion-3: light-dark(#2f7a58, #a3d6b4);
+  --on-suggestion: light-dark(#ffffff, #10140f);
   --danger: light-dark(#a3372b, #e58a7e);
   --on-danger: light-dark(#ffffff, #1a0f0d);
   --focus: light-dark(#285f45, #8fc7a4);

@@ -37,7 +37,7 @@ export interface Collection {
 
 export type DeckNode = DeckLeaf | Collection;
 
-const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
+export const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
 
 function newCollection(name: string, key: string): Collection {
   return {

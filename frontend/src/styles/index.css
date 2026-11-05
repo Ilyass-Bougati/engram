@@ -113,6 +113,10 @@
   --color-popover-foreground: var(--ink);
   --color-primary: var(--pine);
   --color-primary-foreground: var(--on-pine);
+  --color-suggestion-1: var(--suggestion-1);
+  --color-suggestion-2: var(--suggestion-2);
+  --color-suggestion-3: var(--suggestion-3);
+  --color-on-suggestion: var(--on-suggestion);
   --color-secondary: var(--surface);
   --color-secondary-foreground: var(--ink);
   --color-muted: var(--surface-sunken);

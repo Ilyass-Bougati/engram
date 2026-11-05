@@ -149,6 +149,14 @@ checks.push({
   backgrounds: (s) => solid("danger", s),
   min: TEXT,
 });
+for (const stop of ["suggestion-1", "suggestion-2", "suggestion-3"]) {
+  checks.push({
+    label: `on-suggestion on ${stop}`,
+    foreground: "on-suggestion",
+    backgrounds: (s) => solid(stop, s),
+    min: TEXT,
+  });
+}
 for (const control of ["line-strong", "focus"]) {
   checks.push({
     label: `${control} on the page`,

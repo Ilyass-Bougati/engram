@@ -39,6 +39,7 @@ import { useFilePicker } from "@/lib/useFilePicker";
 import { AnkiImportDialog } from "@/routes/decks/AnkiImportDialog";
 import { CollectionHint } from "@/routes/decks/CollectionHint";
 import { DeckTree } from "@/routes/decks/DeckTree";
+import { SuggestionCard } from "@/routes/decks/SuggestionCard";
 
 function NewDeckDialog({
   open,
@@ -191,7 +192,10 @@ export function DecksPage() {
           </p>
         </EmptyState>
       ) : (
-        <DeckTree nodes={buildDeckTree(decks.data)} />
+        <>
+          <SuggestionCard decks={decks.data} />
+          <DeckTree nodes={buildDeckTree(decks.data)} />
+        </>
       )}
       <NewDeckDialog
         open={dialog === "new"}

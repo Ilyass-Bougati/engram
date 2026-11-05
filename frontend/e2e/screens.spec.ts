@@ -148,6 +148,12 @@ test("screenshots of every screen", async ({ browser, page, apiAs }) => {
 
   await signInAs(page, admin);
   await page.goto("/");
+  const suggestion = page.getByRole("link", { name: /^Suggested for you/ });
+  const firstFrame = await suggestion.screenshot();
+  await page.waitForTimeout(1000);
+  expect(await suggestion.screenshot()).not.toEqual(firstFrame);
+  await suggestion.click();
+  await expect(page).toHaveURL(/\/decks\/[^/]+\/study$/);
   for (const variant of VARIANTS) {
     await page.setViewportSize(variant);
     await page.emulateMedia({ colorScheme: variant.colorScheme });
