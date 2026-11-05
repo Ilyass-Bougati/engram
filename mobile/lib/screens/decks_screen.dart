@@ -4,9 +4,11 @@ import '../api/client.dart';
 import '../api/models.dart';
 import '../collections.dart';
 import '../format.dart';
+import '../suggestion.dart';
 import '../theme.dart';
 import '../widgets/glass.dart';
 import '../widgets/states.dart';
+import 'decks/suggestion_card.dart';
 import 'study_screen.dart';
 
 /// Your decks, grouped into collections, with what's due today. Tapping one starts studying.
@@ -89,7 +91,11 @@ class _DecksScreenState extends State<DecksScreen> {
               ),
               const SizedBox(height: 4),
               _TotalsLine(decks: decks),
-              const SizedBox(height: 12),
+              const SizedBox(height: 16),
+              if (suggestDeck(decks) != null) ...[
+                SuggestionCard(decks: decks, onStudy: _study),
+                const SizedBox(height: 16),
+              ],
               Card(
                 clipBehavior: Clip.antiAlias,
                 child: Column(children: _rows(buildDeckTree(decks), 0)),
