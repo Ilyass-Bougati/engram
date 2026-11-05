@@ -5,7 +5,7 @@
 | In the app | Web only |
 |---|---|
 | Sign in, and sign up from an invite link | Creating, editing and deleting decks and cards |
-| Your decks, grouped into collections, with today's due and new counts | Imports (deck files and Anki) and exports, forks |
+| Your decks, grouped into collections, with today's due and new counts, and the same "Suggested for you" deck as the web | Imports (deck files and Anki) and exports, forks |
 | Studying basic and quiz cards | Sharing and members |
 | Stats: streaks, retention, activity, card states | Deck settings, such as the new-card limit |
 | Settings: theme, timezone, password, sign out | Admin: invites and accounts |
@@ -47,6 +47,7 @@ The app uses the web app's design tokens, ported to [`theme.dart`](../mobile/lib
 
 - **Glass** goes only on what floats over content, as on the web: the top bar (content scrolls under it), the account menu, sheets, and the review card, which uses the thinner fill over the study backdrop. It is a 24 px blur with 140 % saturation, one edge and a highlight along the top. With the system's high-contrast setting on, glass turns into a solid surface.
 - **The backdrop** is the web's paper gradient with a pine glow from the top left and a warm one from the bottom right. While studying, the pine glow moves behind the card.
+- **The suggestion card** sits above the deck list, as on the web. It picks the same deck (`lib/suggestion.dart` ports `suggestion.ts`), over the same slow swirl of the three `suggestion` greens. The swirl is a fragment shader (`shaders/suggestion_swirl.frag`), the web's GLSL in Flutter's dialect. It holds still with reduced motion, and shows a solid green if the shader can't load.
 - **Motion:** pages, new review cards and revealed answers rise in (fade plus 6 px, 200 ms); going back takes 120 ms. Menus grow from their corner, and sheets come in like the web's dialogs (280 ms). Everything uses the standard deceleration curve. With the system's reduce-motion setting on, nothing moves.
 
 When a token changes in `frontend/src/styles/tokens.css`, change it in `theme.dart` too.

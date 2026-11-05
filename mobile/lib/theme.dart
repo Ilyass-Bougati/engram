@@ -33,6 +33,10 @@ class EngramColors extends ThemeExtension<EngramColors> {
     required this.glassEdge,
     required this.glassHighlight,
     required this.scrim,
+    required this.suggestion1,
+    required this.suggestion2,
+    required this.suggestion3,
+    required this.onSuggestion,
   });
 
   static const light = EngramColors(
@@ -61,6 +65,10 @@ class EngramColors extends ThemeExtension<EngramColors> {
     glassEdge: Color(0x1A1C1B19),
     glassHighlight: Color(0xB3FFFFFF),
     scrim: Color(0x471C1B19),
+    suggestion1: Color(0xFF123F2B),
+    suggestion2: Color(0xFF1C5A3E),
+    suggestion3: Color(0xFF2F7A58),
+    onSuggestion: Color(0xFFFFFFFF),
   );
 
   static const dark = EngramColors(
@@ -89,6 +97,10 @@ class EngramColors extends ThemeExtension<EngramColors> {
     glassEdge: Color(0x1AECEAE6),
     glassHighlight: Color(0x0FFFFFFF),
     scrim: Color(0x80000000),
+    suggestion1: Color(0xFF5F9A78),
+    suggestion2: Color(0xFF7DB592),
+    suggestion3: Color(0xFFA3D6B4),
+    onSuggestion: Color(0xFF10140F),
   );
 
   final Color paperTop;
@@ -125,6 +137,13 @@ class EngramColors extends ThemeExtension<EngramColors> {
   final Color glassEdge;
   final Color glassHighlight;
   final Color scrim;
+
+  /// The study suggestion: a slow swirl (widgets/shader_swirl.dart) that only ever mixes these
+  /// three greens, so text in [onSuggestion] reads on every pixel. tokens.css checks the pairs.
+  final Color suggestion1;
+  final Color suggestion2;
+  final Color suggestion3;
+  final Color onSuggestion;
 
   Color rating(int value) => switch (value) {
     1 => ratingAgain,
