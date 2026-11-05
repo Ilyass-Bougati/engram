@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../auth/session.dart';
 import '../preferences.dart';
+import '../reminders/reminders.dart';
 import '../theme.dart';
 import '../widgets/engram_mark.dart';
 import '../widgets/glass.dart';
@@ -15,10 +16,16 @@ enum _Tab { decks, stats }
 /// The signed-in app, laid out like the web app's AppShell: a glass top bar with the mark, the
 /// Decks and Stats links and the account menu, over the current page.
 class HomeShell extends StatefulWidget {
-  const HomeShell({super.key, required this.session, required this.preferences});
+  const HomeShell({
+    super.key,
+    required this.session,
+    required this.preferences,
+    required this.reminders,
+  });
 
   final SessionController session;
   final Preferences preferences;
+  final Reminders reminders;
 
   @override
   State<HomeShell> createState() => _HomeShellState();
@@ -29,7 +36,11 @@ class _HomeShellState extends State<HomeShell> {
 
   void _openSettings() => Navigator.of(context).push(
     MaterialPageRoute<void>(
-      builder: (_) => SettingsScreen(session: widget.session, preferences: widget.preferences),
+      builder: (_) => SettingsScreen(
+        session: widget.session,
+        preferences: widget.preferences,
+        reminders: widget.reminders,
+      ),
     ),
   );
 
@@ -73,7 +84,7 @@ class _HomeShellState extends State<HomeShell> {
       body: RiseIn(
         key: ValueKey(_tab),
         child: switch (_tab) {
-          _Tab.decks => DecksScreen(api: widget.session.api),
+          _Tab.decks => DecksScreen(api: widget.session.api, reminders: widget.reminders),
           _Tab.stats => StatsScreen(api: widget.session.api),
         },
       ),
