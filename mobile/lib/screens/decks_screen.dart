@@ -4,6 +4,7 @@ import '../api/client.dart';
 import '../api/models.dart';
 import '../collections.dart';
 import '../format.dart';
+import '../reminders/reminders.dart';
 import '../suggestion.dart';
 import '../theme.dart';
 import '../widgets/glass.dart';
@@ -14,19 +15,28 @@ import 'study_screen.dart';
 /// Your decks, grouped into collections, with what's due today. Tapping one starts studying.
 /// The body of the Decks tab in the home shell.
 class DecksScreen extends StatefulWidget {
-  const DecksScreen({super.key, required this.api});
+  const DecksScreen({super.key, required this.api, this.reminders});
 
   final ApiClient api;
+
+  /// Told what's left today after every load, so reminders can skip a finished day.
+  final Reminders? reminders;
 
   @override
   State<DecksScreen> createState() => _DecksScreenState();
 }
 
 class _DecksScreenState extends State<DecksScreen> {
-  late Future<List<Deck>> _decks = widget.api.decks();
+  late Future<List<Deck>> _decks = _load();
+
+  Future<List<Deck>> _load() async {
+    final decks = await widget.api.decks();
+    await widget.reminders?.updateFromDecks(decks);
+    return decks;
+  }
 
   Future<void> _reload() {
-    final next = widget.api.decks();
+    final next = _load();
     setState(() => _decks = next);
     return next.then((_) {}, onError: (_) {});
   }
@@ -34,7 +44,14 @@ class _DecksScreenState extends State<DecksScreen> {
   Future<void> _study(Deck deck) async {
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => StudyScreen(api: widget.api, deck: deck),
+        builder: (_) => StudyScreen(
+          api: widget.api,
+          deck: deck,
+          onFinished: (study) {
+            final nextDue = study.nextDueAt;
+            if (nextDue != null) widget.reminders?.noteNextDue(nextDue);
+          },
+        ),
       ),
     );
     // Counts are stale once anything is rated.

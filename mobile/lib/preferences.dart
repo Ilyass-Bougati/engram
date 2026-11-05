@@ -10,6 +10,8 @@ class Preferences extends ChangeNotifier {
   static const _serverKey = 'server';
   static const _serversKey = 'servers';
   static const _themeKey = 'theme';
+  static const _remindersKey = 'reminders';
+  static const _reminderTimesKey = 'reminder_times';
 
   final SharedPreferences _prefs;
 
@@ -37,6 +39,26 @@ class Preferences extends ChangeNotifier {
     if (this.server == server) await _prefs.remove(_serverKey);
     await _prefs.setStringList(_serversKey, others);
     notifyListeners();
+  }
+
+  bool get remindersEnabled => _prefs.getBool(_remindersKey) ?? false;
+
+  Future<void> setRemindersEnabled(bool enabled) => _prefs.setBool(_remindersKey, enabled);
+
+  /// Reminder times on the phone's clock, sorted, stored as "HH:MM".
+  List<TimeOfDay> get reminderTimes => [
+    for (final text in _prefs.getStringList(_reminderTimesKey) ?? const <String>[])
+      if (RegExp(r'^(\d\d):(\d\d)$').firstMatch(text) case final match?)
+        TimeOfDay(hour: int.parse(match[1]!), minute: int.parse(match[2]!)),
+  ];
+
+  Future<void> setReminderTimes(List<TimeOfDay> times) {
+    final sorted = {...times}.toList()
+      ..sort((a, b) => (a.hour * 60 + a.minute).compareTo(b.hour * 60 + b.minute));
+    String two(int n) => n.toString().padLeft(2, '0');
+    return _prefs.setStringList(_reminderTimesKey, [
+      for (final t in sorted) '${two(t.hour)}:${two(t.minute)}',
+    ]);
   }
 
   ThemeMode get themeMode =>

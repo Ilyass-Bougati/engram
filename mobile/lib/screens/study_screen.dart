@@ -15,25 +15,36 @@ const _ratingLabels = {1: 'Again', 2: 'Hard', 3: 'Good', 4: 'Easy'};
 /// Studying one deck: the web app's Study page. Basic cards show the front, then the answer and
 /// four ratings. Quiz cards are graded by the server; a wrong answer is already rated Again.
 class StudyScreen extends StatefulWidget {
-  const StudyScreen({super.key, required this.api, required this.deck});
+  const StudyScreen({super.key, required this.api, required this.deck, this.onFinished});
 
   final ApiClient api;
   final Deck deck;
+
+  /// Called when there's nothing left to study in this deck, with when cards come back.
+  final ValueChanged<StudyNext>? onFinished;
 
   @override
   State<StudyScreen> createState() => _StudyScreenState();
 }
 
 class _StudyScreenState extends State<StudyScreen> {
-  late Future<StudyNext> _initial = widget.api.studyNext(widget.deck.id);
+  late Future<StudyNext> _initial = _first();
+
+  Future<StudyNext> _first() async {
+    final study = await widget.api.studyNext(widget.deck.id);
+    if (study.card == null) widget.onFinished?.call(study);
+    return study;
+  }
+
   StudyNext? _current;
   int _reviewed = 0;
   bool _rating = false;
   Object? _ratingError;
 
-  void _retry() => setState(() => _initial = widget.api.studyNext(widget.deck.id));
+  void _retry() => setState(() => _initial = _first());
 
   void _advance(StudyNext next) => setState(() {
+    if (next.card == null) widget.onFinished?.call(next);
     _current = next;
     _reviewed += 1;
     _ratingError = null;

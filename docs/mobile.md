@@ -8,7 +8,7 @@
 | Your decks, grouped into collections, with today's due and new counts, and the same "Suggested for you" deck as the web | Imports (deck files and Anki) and exports, forks |
 | Studying basic and quiz cards | Sharing and members |
 | Stats: streaks, retention, activity, card states | Deck settings, such as the new-card limit |
-| Settings: theme, timezone, password, sign out | Admin: invites and accounts |
+| Settings: theme, study reminders, timezone, password, sign out | Admin: invites and accounts |
 
 It talks to the same API as the web app, and the backend needed no changes for it.
 
@@ -31,6 +31,19 @@ The app follows the same rules as the web client (see [security](security.md#ses
 - The **refresh token** is the `engram_refresh` cookie. The app reads it from `Set-Cookie` at sign-in, sign-up, refresh and password change, and sends it back as a `Cookie` header with `X-Engram-CSRF: 1`. Between launches it is kept in the OS keystore, one entry per server: the Keychain on iOS (this device only, after first unlock), and Keystore-backed storage on Android, with app backups and device transfer turned off.
 - **Refreshes never overlap.** Each refresh rotates the token, and presenting a rotated one ends the whole sign-in as suspected theft. So concurrent requests that hit a 401 share one refresh.
 - **Signing out** revokes the token chain on the server and deletes the stored token. Offline, the token is deleted on the phone anyway.
+
+## Study reminders
+
+Settings → Reminders turns on a daily nudge at up to four times you choose. Each reminder is skipped once the day's reviews are done. It all happens on the phone, with nothing new on the server:
+
+- **Done means nothing left.** The app treats the day as done when every deck's due and new counts from `GET /api/decks` are zero. It checks whenever the deck list loads, when a study session ends, and when the app comes back to the foreground.
+- **Skipping lasts until the study day ends.** That's 04:00 in your account's timezone, the same rollover as the server. If a session ended with cards coming back later the same day (learning steps), reminders resume from that time.
+- **Reminder times follow the phone's clock.** That holds across daylight-saving changes and travel.
+- **Reminders are scheduled two weeks ahead and redone every time the app learns something new.** A repeating notification can't skip a single day on iOS, so the app schedules one-off notifications instead. iOS keeps at most 64 pending, which is why there are at most four a day. If the app isn't opened for two weeks, reminders stop, and the last one says so.
+- **The text is generic** ("Time to study"), not a count, because a count would be stale by the time it shows.
+- **Permission is asked when you turn reminders on, not at launch.** If it's refused, the switch stays off and says where to turn notifications on.
+- **Android timing is approximate.** Reminders may arrive a few minutes late, which needs no exact-alarm permission. They're put back after a reboot or an app update. Some phone makers' battery savers can still delay them.
+- **Reminders belong to whoever is signed in on the server in use.** Signing out cancels them. Starting the app offline keeps the ones already scheduled.
 
 ## Card content
 
