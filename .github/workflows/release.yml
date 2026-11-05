@@ -1,7 +1,8 @@
 name: Release
 
-# Pushing a tag like v0.2.0 runs every check, then builds the app image and pushes it to
-# ghcr.io/l03x/engram:0.2.0. Deploying it to the cluster stays a manual step (README).
+# Pushing a tag like v0.3.0 runs every check, then builds the app image and pushes it to
+# ghcr.io/l03x/engram as 0.3.0 and latest. The cluster runs latest and picks it up the next
+# time the backend restarts (README).
 on:
   push:
     tags: ["v*.*.*"]
@@ -20,8 +21,8 @@ jobs:
         working-directory: backend
     steps:
       - uses: actions/checkout@v4
-      # The tag becomes the image tag, and kustomization.yaml pins the image by version, so a
-      # tag that disagrees with pyproject.toml would ship a mislabelled image.
+      # The tag becomes the image tag, and compose.yaml pins the image by version, so a tag
+      # that disagrees with pyproject.toml would ship a mislabelled image.
       - name: Tag matches pyproject version
         run: |
           version=$(sed -n 's/^version = "\(.*\)"/\1/p' pyproject.toml)
@@ -77,7 +78,9 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.IMAGE }}
-          tags: type=semver,pattern={{version}}
+          tags: |
+            type=semver,pattern={{version}}
+            type=raw,value=latest
       # Both architectures, so the image runs whether the server is x86 or ARM.
       - uses: docker/build-push-action@v6
         with:

@@ -89,6 +89,6 @@ The end-to-end run uses its own Compose project, `engram-e2e`, and removes it af
 
 ### Releases
 
-The version appears in three places, which must agree: `backend/pyproject.toml`, `newTag` in `deploy/k8s/kustomization.yaml`, and `image` in `compose.yaml`. The release workflow builds `ghcr.io/l03x/engram:<version>` when the matching `v<version>` tag is pushed. See [docs/development.md](docs/development.md#releases).
+The version appears in two places, which must agree: `backend/pyproject.toml` and `image` in `compose.yaml`. The release workflow builds `ghcr.io/l03x/engram:<version>` and moves `latest` when the matching `v<version>` tag is pushed. The cluster runs `latest` and migrates in the backend's initContainer on every pod start, so a migration must be safe to run as soon as a release is published. See [docs/development.md](docs/development.md#releases).
 
 The mobile app is released separately: a `mobile-v<version>` tag matching `version` in `mobile/pubspec.yaml` publishes a signed Android build as a GitHub release ([docs/mobile.md](docs/mobile.md#releases)).

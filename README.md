@@ -46,9 +46,8 @@ The manifests in [`deploy/k8s/`](deploy/k8s) are plain kustomize. They contain n
 |---|---|---|
 | `engram` | Namespace | Pod Security `restricted` enforced |
 | `postgres` | StatefulSet + headless Service | 5 Gi PVC on `local-path` |
-| `engram-migrate` | Job | `alembic upgrade head`, removed 10 minutes after it finishes |
 | `backend` | Deployment + ClusterIP Service at the fixed address `10.43.67.67:8000` | The app (web pages and `/api`). 1 replica. An initContainer waits until the schema matches the image. |
-| `default-deny-ingress`, `postgres`, `backend` | NetworkPolicy | Postgres accepts the backend and the Job only. The app accepts pods in the namespace only. |
+| `default-deny-ingress`, `postgres`, `backend` | NetworkPolicy | Postgres accepts the backend only. The app accepts pods in the namespace only. |
 
 Every pod runs as non-root with a read-only root filesystem, no capabilities, the runtime's seccomp profile and no service account token.
 
@@ -58,7 +57,6 @@ Every pod runs as non-root with a read-only root filesystem, no capabilities, th
 |---|---|---|
 | Postgres (`shared_buffers=128MB`, `max_connections=30`) | 256Mi / 512Mi | 100m / 1 |
 | Backend (1 uvicorn worker) | 160Mi / 384Mi | 50m / 1 |
-| Migration Job (only while it runs) | 128Mi / 256Mi | 50m / 500m |
 
 In steady state Engram requests 416Mi and is capped at 896Mi.
 
@@ -93,7 +91,7 @@ If the server's CPU architecture differs from the build machine (an arm64 server
 docker buildx build --platform linux/arm64 -t ghcr.io/l03x/engram:0.3.0 --push .
 ```
 
-The tag the cluster runs is set in `deploy/k8s/kustomization.yaml` under `images`.
+The cluster runs `latest`, set in `deploy/k8s/kustomization.yaml` under `images`.
 
 ### 2. Let the cluster pull the image
 
@@ -121,11 +119,10 @@ kubectl apply -f deploy/k8s/secret.yaml
 
 ```bash
 kubectl apply -k deploy/k8s
-kubectl -n engram wait --for=condition=complete job/engram-migrate --timeout=5m
 kubectl -n engram rollout status deploy/backend --timeout=5m
 ```
 
-On a fresh install the Job may fail once or twice while Postgres initializes. It retries on its own.
+On a fresh install the migration step may fail once or twice while Postgres initializes. It retries on its own.
 
 ### 5. Create the first admin
 
@@ -169,15 +166,18 @@ Two things depend on where cloudflared runs:
 
 **From 0.1.x to 0.2.0:** the image was renamed from `engram-backend` to `engram`, and it now contains the web app. On GitHub that's a new package, which starts out private again: make it public, or keep using the pull secret from step 2. Also simplify the tunnel to the single rule in step 7.
 
-Release the new version (step 1), wait for the workflow to finish, then set the new tag under `images` in `kustomization.yaml`. A Job can't be changed in place, so delete the finished one before applying:
+The cluster runs the `latest` image, which the release workflow moves to each new version. To upgrade, release the new version (step 1), wait for the workflow to finish, then restart the backend:
 
 ```bash
-kubectl -n engram delete job engram-migrate --ignore-not-found
-kubectl apply -k deploy/k8s
+kubectl -n engram rollout restart deploy/backend
 kubectl -n engram rollout status deploy/backend --timeout=5m
 ```
 
-The new backend pod waits until the Job has migrated the schema. The Deployment uses `Recreate`, so the API is down for a few seconds during the switch.
+The new pod pulls the image, migrates the schema in its initContainer, then starts serving. The Deployment uses `Recreate`, so the API is down for a few seconds during the switch.
+
+Any pod start does the same, so a crash or a node reboot also picks up a new release, and needs GHCR to be reachable. The pod keeps retrying until it is.
+
+To hold the cluster on one version or roll back, set that version as `newTag` under `images` in `kustomization.yaml`, then `kubectl apply -k deploy/k8s`. Migrations aren't reversed, so going back across a schema change needs a [backup](#backups) from before it.
 
 ### Backups
 

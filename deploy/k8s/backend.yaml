@@ -46,10 +46,13 @@ spec:
         seccompProfile:
           type: RuntimeDefault
       initContainers:
-        - name: wait-for-migrations
+        # Every pod start pulls the newest release, so the schema is brought up to it here,
+        # before the API starts. One replica and Recreate mean only one of these runs at a
+        # time. Postgres may still be starting on a fresh install; failures retry with backoff.
+        - name: migrate
           image: ghcr.io/l03x/engram
-          imagePullPolicy: IfNotPresent
-          command: ["python", "-m", "app.cli", "wait-for-migrations", "--timeout", "600"]
+          imagePullPolicy: Always
+          command: ["alembic", "upgrade", "head"]
           env: &env
             - name: POSTGRES_PASSWORD
               valueFrom:
@@ -81,7 +84,7 @@ spec:
       containers:
         - name: backend
           image: ghcr.io/l03x/engram
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Always
           env: *env
           ports:
             - name: http

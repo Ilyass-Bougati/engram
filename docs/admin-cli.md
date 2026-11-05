@@ -10,7 +10,7 @@ Run these inside the backend container:
 |---|---|
 | `python -m app.cli create-admin <username>` | Creates an admin. Prompts for the password twice. |
 | `python -m app.cli set-password <username>` | Sets a new password and signs out all of that user's sessions. The app sends no email, so this is how a forgotten password gets reset. |
-| `python -m app.cli wait-for-migrations [--timeout 300]` | Blocks until the database schema matches the code, then exits 0. It exits non-zero at the timeout. The k8s initContainer uses it. |
+| `python -m app.cli wait-for-migrations [--timeout 300]` | Blocks until the database schema matches the code, then exits 0. It exits non-zero at the timeout. |
 
 `create-admin` and `set-password` accept `--password-stdin`, which reads the password from the first line of stdin instead of prompting:
 

@@ -9,7 +9,6 @@ resources:
   - namespace.yaml
   - networkpolicy.yaml
   - postgres.yaml
-  - migrate-job.yaml
   - backend.yaml
 
 labels:
@@ -18,6 +17,8 @@ labels:
     includeSelectors: false
     includeTemplates: true
 
+# The release workflow moves `latest` to each new version. To hold the cluster on one version,
+# or roll back, put that version here instead.
 images:
   - name: ghcr.io/l03x/engram
-    newTag: 0.3.0
+    newTag: latest

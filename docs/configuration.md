@@ -11,7 +11,7 @@ Engram reads its configuration from environment variables only. It reads no `.en
 | `REFRESH_TOKEN_DAYS` | no (default 30) | Lifetime of a refresh token, from 1 to 365. Each refresh rotates the token. |
 | `FORWARDED_ALLOW_IPS` | no (default `127.0.0.1,::1`) | Addresses or CIDR ranges whose `X-Forwarded-For` header uvicorn trusts. See [proxies](#proxies-and-client-ips). |
 
-The migration Job, the `wait-for-migrations` initContainer and the admin CLI load the same settings, so they need `DATABASE_URL` and `JWT_SECRET` too.
+The migration step and the admin CLI load the same settings, so they need `DATABASE_URL` and `JWT_SECRET` too.
 
 The web app needs no configuration: it's built into the image and calls the API on its own origin.
 

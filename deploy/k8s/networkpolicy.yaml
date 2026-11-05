@@ -8,7 +8,7 @@ spec:
   podSelector: {}
   policyTypes: [Ingress]
 ---
-# Postgres takes connections only from the backend and the migration Job.
+# Postgres takes connections only from the backend, including its migration step.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
