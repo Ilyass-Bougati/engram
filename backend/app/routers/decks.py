@@ -40,7 +40,7 @@ class DeckView(BaseModel):
     updated_at: datetime
 
 
-def _deck_views(
+def deck_views(
     session: Session, user: User, rows: Sequence[tuple[Deck, DeckMember]]
 ) -> list[DeckView]:
     deck_ids = [deck.id for deck, _ in rows]
@@ -89,7 +89,7 @@ def list_decks(user: CurrentUser, session: SessionDep) -> list[DeckView]:
         .where(DeckMember.user_id == user.id)
         .order_by(func.lower(Deck.name), col(Deck.created_at))
     ).all()
-    return _deck_views(session, user, rows)
+    return deck_views(session, user, rows)
 
 
 @router.post("", status_code=status.HTTP_201_CREATED)
@@ -97,7 +97,7 @@ def create_deck(body: DeckMeta, user: CurrentUser, session: SessionDep) -> DeckV
     """Create a deck. You become its owner."""
     deck, member = _create_owned_deck(session, user, body)
     session.commit()
-    return _deck_views(session, user, [(deck, member)])[0]
+    return deck_views(session, user, [(deck, member)])[0]
 
 
 @router.post("/import", status_code=status.HTTP_201_CREATED)
@@ -106,7 +106,7 @@ def import_new_deck(body: DeckFile, user: CurrentUser, session: SessionDep) -> D
     deck, member = _create_owned_deck(session, user, body.deck)
     add_cards(session, deck.id, body.cards)
     session.commit()
-    return _deck_views(session, user, [(deck, member)])[0]
+    return deck_views(session, user, [(deck, member)])[0]
 
 
 ANKI_IMPORT_PATH = "/api/decks/import/anki"
@@ -182,7 +182,7 @@ def _store_anki_deck(
             session.connection().execute(insert(ReviewLog), logs)
     session.commit()
     return AnkiImportResult(
-        deck=_deck_views(session, user, [(deck, member)])[0],
+        deck=deck_views(session, user, [(deck, member)])[0],
         imported=len(cards),
         skipped=conversion.skipped,
         media_removed=conversion.media_removed,
@@ -246,7 +246,7 @@ async def import_anki_deck(
 @router.get("/{deck_id}")
 def get_deck(access: ViewerAccess, session: SessionDep) -> DeckView:
     """A deck, with your role and today's counts."""
-    return _deck_views(session, access.user, [(access.deck, access.member)])[0]
+    return deck_views(session, access.user, [(access.deck, access.member)])[0]
 
 
 class DeckUpdate(StrictModel):
@@ -267,7 +267,7 @@ def update_deck(body: DeckUpdate, access: OwnerAccess, session: SessionDep) -> D
     deck.updated_at = utcnow()
     session.add(deck)
     session.commit()
-    return _deck_views(session, access.user, [(deck, access.member)])[0]
+    return deck_views(session, access.user, [(deck, access.member)])[0]
 
 
 @router.delete("/{deck_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -290,7 +290,7 @@ def update_my_deck_settings(
     access.member.new_cards_per_day = body.new_cards_per_day
     session.add(access.member)
     session.commit()
-    return _deck_views(session, access.user, [(access.deck, access.member)])[0]
+    return deck_views(session, access.user, [(access.deck, access.member)])[0]
 
 
 def _deck_file(session: Session, access: DeckAccess) -> DeckFile:
@@ -322,7 +322,7 @@ def fork_deck(access: ViewerAccess, session: SessionDep) -> DeckView:
     deck, member = _create_owned_deck(session, access.user, meta)
     add_cards(session, deck.id, source.cards)
     session.commit()
-    return _deck_views(session, access.user, [(deck, member)])[0]
+    return deck_views(session, access.user, [(deck, member)])[0]
 
 
 @router.get("/{deck_id}/export")
@@ -343,5 +343,5 @@ def import_into_deck(body: DeckFile, access: EditorAccess, session: SessionDep) 
     """Add the cards from a deck file. Its deck name and description are ignored."""
     add_cards(session, access.deck.id, body.cards)
     session.commit()
-    [deck_view] = _deck_views(session, access.user, [(access.deck, access.member)])
+    [deck_view] = deck_views(session, access.user, [(access.deck, access.member)])
     return ImportResult(imported=len(body.cards), deck=deck_view)

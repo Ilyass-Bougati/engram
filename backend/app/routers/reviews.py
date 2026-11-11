@@ -1,4 +1,5 @@
 import uuid
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Annotated, Literal
 
@@ -8,8 +9,8 @@ from pydantic import BaseModel, Field
 from sqlmodel import Session, col, select
 
 from app.db import SessionDep
-from app.deps import DeckAccess, ViewerAccess
-from app.models import Card, CardKind, QuizOption, ReviewState, utcnow
+from app.deps import CollectionAccess, DeckAccess, ViewerAccess
+from app.models import Card, CardKind, QuizOption, ReviewState, User, utcnow
 from app.scheduling import (
     apply_rating,
     new_review_state,
@@ -32,6 +33,7 @@ class StudyOption(BaseModel):
 
 class BasicStudyCard(BaseModel):
     id: uuid.UUID
+    deck_id: uuid.UUID
     type: Literal["basic"] = "basic"
     front: str
     back: str
@@ -40,6 +42,7 @@ class BasicStudyCard(BaseModel):
 class QuizStudyCard(BaseModel):
     # No correct flags and no explanation: grading happens on the server after answering.
     id: uuid.UUID
+    deck_id: uuid.UUID
     type: Literal["quiz"] = "quiz"
     question: str
     select_all: bool
@@ -57,20 +60,39 @@ class StudyNext(BaseModel):
     next_due_at: datetime | None
 
 
-def _study_next(session: Session, access: DeckAccess) -> StudyNext:
+@dataclass
+class StudyScope:
+    """What one study session draws from: a deck, or every deck of a collection."""
+
+    user: User
+    # The user's new-card limit for each deck, in the order new cards are drawn.
+    limits: dict[uuid.UUID, int]
+
+    @classmethod
+    def of_deck(cls, access: DeckAccess) -> "StudyScope":
+        return cls(access.user, {access.deck.id: access.member.new_cards_per_day})
+
+    @classmethod
+    def of_collection(cls, access: CollectionAccess) -> "StudyScope":
+        return cls(
+            access.user, {deck.id: member.new_cards_per_day for deck, member in access.decks}
+        )
+
+
+def study_next(session: Session, scope: StudyScope) -> StudyNext:
     now = utcnow()
-    deck_id = access.deck.id
-    counts = study_counts(session, access.user, {deck_id: access.member.new_cards_per_day}, now)[
-        deck_id
-    ]
-    card = next_card(session, access.user, deck_id, counts, now)
+    counts = study_counts(session, scope.user, scope.limits, now)
+    card = next_card(session, scope.user, counts, now)
     study_card: StudyCard | None = None
     if card is not None and card.kind == CardKind.basic:
-        study_card = BasicStudyCard(id=card.id, front=card.prompt, back=card.answer or "")
+        study_card = BasicStudyCard(
+            id=card.id, deck_id=card.deck_id, front=card.prompt, back=card.answer or ""
+        )
     elif card is not None:
         options = session.exec(select(QuizOption).where(QuizOption.card_id == card.id)).all()
         study_card = QuizStudyCard(
             id=card.id,
+            deck_id=card.deck_id,
             question=card.prompt,
             select_all=card.select_all,
             # Reshuffled on every review so an answer can't be remembered by its position.
@@ -78,9 +100,9 @@ def _study_next(session: Session, access: DeckAccess) -> StudyNext:
         )
     return StudyNext(
         card=study_card,
-        due_count=counts.due,
-        new_count=counts.new,
-        next_due_at=None if card else next_due_at(session, access.user, deck_id),
+        due_count=sum(c.due for c in counts.values()),
+        new_count=sum(c.new for c in counts.values()),
+        next_due_at=None if card else next_due_at(session, scope.user, list(scope.limits)),
     )
 
 
@@ -91,35 +113,33 @@ def get_next_card(access: ViewerAccess, session: SessionDep) -> StudyNext:
     Due cards come first, then new cards up to your daily limit. `card` is null when you're done
     for now. Quiz options are shuffled and carry no answer key.
     """
-    return _study_next(session, access)
+    return study_next(session, StudyScope.of_deck(access))
 
 
 def _review_target(
-    session: Session, access: DeckAccess, card_id: uuid.UUID
+    session: Session, scope: StudyScope, card_id: uuid.UUID
 ) -> tuple[Card, ReviewState]:
     card = session.exec(
-        select(Card).where(Card.id == card_id, Card.deck_id == access.deck.id)
+        select(Card).where(Card.id == card_id, col(Card.deck_id).in_(scope.limits))
     ).first()
     if card is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Card not found.")
     state = session.exec(
         select(ReviewState)
-        .where(ReviewState.user_id == access.user.id, ReviewState.card_id == card.id)
+        .where(ReviewState.user_id == scope.user.id, ReviewState.card_id == card.id)
         .with_for_update()
     ).first()
     if state is not None:
         return card, state
     now = utcnow()
-    deck_id = access.deck.id
-    counts = study_counts(session, access.user, {deck_id: access.member.new_cards_per_day}, now)[
-        deck_id
-    ]
+    deck_id = card.deck_id
+    counts = study_counts(session, scope.user, {deck_id: scope.limits[deck_id]}, now)[deck_id]
     if counts.new == 0:
         raise HTTPException(
             status.HTTP_409_CONFLICT,
             "You've reached today's new-card limit for this deck. Raise it in deck settings.",
         )
-    return card, new_review_state(access.user, card, now)
+    return card, new_review_state(scope.user, card, now)
 
 
 class Rating(StrictModel):
@@ -127,14 +147,8 @@ class Rating(StrictModel):
     rating: Annotated[int, Field(ge=1, le=4, description="1 Again, 2 Hard, 3 Good, 4 Easy")]
 
 
-@router.post("/reviews")
-def rate_card(body: Rating, access: ViewerAccess, session: SessionDep) -> StudyNext:
-    """Rate the card you just studied, and get the next one.
-
-    The server schedules the next review. A quiz card can be rated only after a correct answer,
-    and then only Hard, Good or Easy.
-    """
-    card, state = _review_target(session, access, body.card_id)
+def rate(session: Session, scope: StudyScope, body: Rating) -> StudyNext:
+    card, state = _review_target(session, scope, body.card_id)
     now = utcnow()
     if card.kind == CardKind.quiz:
         pending = state.quiz_correct_pending_at
@@ -146,7 +160,17 @@ def rate_card(body: Rating, access: ViewerAccess, session: SessionDep) -> StudyN
             )
     apply_rating(session, state, fsrs.Rating(body.rating), now)
     session.commit()
-    return _study_next(session, access)
+    return study_next(session, scope)
+
+
+@router.post("/reviews")
+def rate_card(body: Rating, access: ViewerAccess, session: SessionDep) -> StudyNext:
+    """Rate the card you just studied, and get the next one.
+
+    The server schedules the next review. A quiz card can be rated only after a correct answer,
+    and then only Hard, Good or Easy.
+    """
+    return rate(session, StudyScope.of_deck(access), body)
 
 
 class QuizAnswer(StrictModel):
@@ -163,14 +187,8 @@ class QuizResult(BaseModel):
     next: StudyNext | None
 
 
-@router.post("/reviews/quiz-answer")
-def answer_quiz(body: QuizAnswer, access: ViewerAccess, session: SessionDep) -> QuizResult:
-    """Answer a quiz card.
-
-    A wrong answer counts as Again and `next` holds the next card. After a correct one, rate the
-    card within an hour.
-    """
-    card, state = _review_target(session, access, body.card_id)
+def grade_quiz(session: Session, scope: StudyScope, body: QuizAnswer) -> QuizResult:
+    card, state = _review_target(session, scope, body.card_id)
     if card.kind != CardKind.quiz:
         raise HTTPException(status.HTTP_409_CONFLICT, "This card isn't a quiz card.")
     options = session.exec(
@@ -199,5 +217,15 @@ def answer_quiz(body: QuizAnswer, access: ViewerAccess, session: SessionDep) -> 
         correct=correct,
         correct_option_ids=correct_ids,
         explanation=card.explanation or "",
-        next=None if correct else _study_next(session, access),
+        next=None if correct else study_next(session, scope),
     )
+
+
+@router.post("/reviews/quiz-answer")
+def answer_quiz(body: QuizAnswer, access: ViewerAccess, session: SessionDep) -> QuizResult:
+    """Answer a quiz card.
+
+    A wrong answer counts as Again and `next` holds the next card. After a correct one, rate the
+    card within an hour.
+    """
+    return grade_quiz(session, StudyScope.of_deck(access), body)

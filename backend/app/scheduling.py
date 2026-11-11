@@ -74,20 +74,25 @@ def study_counts(
 
 
 def next_card(
-    session: Session, user: User, deck_id: uuid.UUID, counts: StudyCounts, now: datetime
+    session: Session, user: User, counts: dict[uuid.UUID, StudyCounts], now: datetime
 ) -> Card | None:
+    # `counts` covers the decks being studied, in the order their new cards are drawn: due
+    # cards come first whichever deck they're in, then one deck's new cards after another.
+    deck_ids = list(counts)
     reviewed = (
         select(Card)
         .join(ReviewState, col(ReviewState.card_id) == Card.id)
-        .where(Card.deck_id == deck_id, ReviewState.user_id == user.id)
+        .where(col(Card.deck_id).in_(deck_ids), ReviewState.user_id == user.id)
     )
     due_card = session.exec(
         reviewed.where(ReviewState.due <= now).order_by(col(ReviewState.due)).limit(1)
     ).first()
     if due_card:
         return due_card
-    if counts.new > 0:
-        return session.exec(
+    for deck_id, deck_counts in counts.items():
+        if deck_counts.new == 0:
+            continue
+        new_card = session.exec(
             select(Card)
             .where(
                 Card.deck_id == deck_id,
@@ -98,6 +103,8 @@ def next_card(
             .order_by(col(Card.created_at), col(Card.id))
             .limit(1)
         ).first()
+        if new_card:
+            return new_card
     return session.exec(
         reviewed.where(
             col(ReviewState.state) != fsrs.State.Review,
@@ -108,11 +115,11 @@ def next_card(
     ).first()
 
 
-def next_due_at(session: Session, user: User, deck_id: uuid.UUID) -> datetime | None:
+def next_due_at(session: Session, user: User, deck_ids: Sequence[uuid.UUID]) -> datetime | None:
     return session.exec(
         select(func.min(ReviewState.due))
         .join(Card, col(ReviewState.card_id) == Card.id)
-        .where(Card.deck_id == deck_id, ReviewState.user_id == user.id)
+        .where(col(Card.deck_id).in_(deck_ids), ReviewState.user_id == user.id)
     ).one()
 
 

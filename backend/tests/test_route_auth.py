@@ -4,7 +4,7 @@ from fastapi import APIRouter, FastAPI
 from fastapi.dependencies.models import Dependant
 from fastapi.routing import APIRoute, RouteContext, iter_route_contexts
 
-from app.deps import DECK_ROLE_DEPENDENCIES, PUBLIC, get_current_user
+from app.deps import DECK_ROLE_DEPENDENCIES, PUBLIC, collection_access, get_current_user
 from app.main import app
 
 EXPECTED_PUBLIC_ROUTES = {
@@ -60,14 +60,27 @@ def test_every_deck_route_checks_deck_membership() -> None:
     assert unchecked == []
 
 
+def test_every_collection_route_resolves_the_callers_decks() -> None:
+    unchecked = [
+        f"{sorted(route.methods or ())} {route.path}"
+        for route in api_routes(app)
+        if route.path
+        and route.path.startswith("/api/collections")
+        and not _depends_on(route.dependant, collection_access)
+    ]
+    assert unchecked == []
+
+
 def test_card_and_member_routes_are_nested_under_a_deck() -> None:
-    # Card and member IDs are only ever resolved inside a deck the caller can access.
+    # Card and member IDs are only ever resolved inside a deck the caller can access, or
+    # inside the decks of a collection the caller is a member of.
     loose = [
         route.path
         for route in api_routes(app)
         if route.path
         and ("{card_id}" in route.path or "/members" in route.path)
         and "{deck_id}" not in route.path
+        and not _depends_on(route.dependant, collection_access)
     ]
     assert loose == []
 

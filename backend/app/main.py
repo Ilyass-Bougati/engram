@@ -7,7 +7,7 @@ from starlette.types import ASGIApp, Receive, Scope, Send
 from app.db import SessionDep
 from app.deps import PUBLIC
 from app.models import CardKind
-from app.routers import admin, auth, cards, decks, invites, me, members, reviews
+from app.routers import admin, auth, cards, collections, decks, invites, me, members, reviews
 from app.routers.decks import ANKI_IMPORT_PATH, MAX_ANKI_UPLOAD_BYTES
 from app.web import SecurityHeaders, web_mount
 
@@ -114,7 +114,7 @@ def ready(session: SessionDep) -> dict[str, str]:
     return {"status": "ok"}
 
 
-for module in (auth, invites, me, admin, decks, members, cards, reviews):
+for module in (auth, invites, me, admin, decks, members, cards, reviews, collections):
     api.include_router(module.router)
 
 app.include_router(api)

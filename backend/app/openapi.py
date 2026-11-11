@@ -19,7 +19,14 @@ from fastapi.dependencies.models import Dependant
 from fastapi.openapi.utils import get_openapi
 from fastapi.routing import APIRoute, RouteContext, iter_route_contexts
 
-from app.deps import CSRF_HEADER, deck_editor, deck_owner, require_admin, require_csrf_header
+from app.deps import (
+    CSRF_HEADER,
+    collection_access,
+    deck_editor,
+    deck_owner,
+    require_admin,
+    require_csrf_header,
+)
 from app.main import LARGER_BODIES, MAX_BODY_BYTES, app
 from app.routers.auth import REFRESH_COOKIE, REFRESH_COOKIE_PATH
 
@@ -54,6 +61,13 @@ adds `errors`, one `{{field, message}}` per problem, with paths like `cards[12].
 Each member of a deck is its owner, an editor or a viewer. A deck you aren't a member of
 answers 404, exactly like one that doesn't exist. A member whose role is too low gets 403.
 
+## Collections
+
+A deck named `Java::Day 1` is the deck `Day 1` in the collection `Java`. Collections aren't
+stored: `/api/collections` routes take the path as `?path=Java` and act on the decks under it
+that you're a member of. Changing names or members needs you to own a deck, and decks you
+don't own are left alone and counted as `skipped`.
+
 ## Limits
 
 Request bodies are capped at 2 MiB (64 MiB for an Anki upload) and need a `Content-Length`
@@ -71,11 +85,16 @@ TAGS = [
     {"name": "members", "description": "Who a deck is shared with, and their roles."},
     {"name": "cards", "description": "Cards and tags in a deck."},
     {"name": "reviews", "description": "Studying: the next card, ratings and quiz answers."},
+    {
+        "name": "collections",
+        "description": "Every deck under a `::` path at once: studying, sharing and settings.",
+    },
 ]
 
 INVITE_GONE = "The invite is unknown, used, expired or revoked; all four look the same."
 CARD_GONE = "The card isn't in this deck."
 NEW_CARD_LIMIT = "The card is new and today's new-card limit for the deck is reached."
+NOT_AN_OWNER = "You don't own any deck in the collection."
 
 # Errors a route raises itself. Those shared by every route of a kind (401, the deck 404,
 # role and admin 403s, 413, 429) come from its dependencies in _errors().
@@ -115,6 +134,31 @@ ROUTE_ERRORS: dict[str, dict[int, str]] = {
         422: "The options aren't this card's (it may have been edited), or more than one was "
         "picked for a single-answer question.",
     },
+    "rename_collection": {
+        403: NOT_AN_OWNER,
+        422: "The name is only `::`, or a deck's new name would pass 200 characters.",
+    },
+    "delete_collection": {403: NOT_AN_OWNER},
+    "rate_collection_card": {
+        404: "The card isn't in the collection.",
+        409: f"A quiz card without a correct answer first, or rated Again. Or: {NEW_CARD_LIMIT}",
+    },
+    "answer_collection_quiz": {
+        404: "The card isn't in the collection.",
+        409: f"The card isn't a quiz card. Or: {NEW_CARD_LIMIT}",
+        422: "The options aren't this card's (it may have been edited), or more than one was "
+        "picked for a single-answer question.",
+    },
+    "share_collection": {
+        403: NOT_AN_OWNER,
+        404: "No user has that username.",
+        409: "It's you, or they already have that role on every deck you own there.",
+    },
+    "remove_collection_member": {
+        403: NOT_AN_OWNER,
+        404: "They have no access to any deck you own there.",
+        409: "You're leaving, but you own every deck in the collection.",
+    },
 }
 
 
@@ -146,6 +190,8 @@ def _errors(name: str, route: RouteContext, operation: dict[str, Any]) -> dict[i
         errors[403] = ["Only the deck's owner can do this."]
     if "{deck_id}" in (route.path or ""):
         errors[404] = ["The deck doesn't exist, or you aren't a member."]
+    if collection_access in calls:
+        errors[404] = ["You aren't a member of any deck in the collection."]
     if "requestBody" in operation:
         limit = LARGER_BODIES.get(route.path or "", (MAX_BODY_BYTES,))[0]
         errors[413] = [f"The body is larger than {limit // MIB} MiB."]

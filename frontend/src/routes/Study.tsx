@@ -11,7 +11,7 @@ import {
   XIcon,
 } from "lucide-react";
 import { useEffect, useEffectEvent, useRef, useState, type ReactNode } from "react";
-import { Link, useParams } from "react-router";
+import { Link, useParams, useSearchParams } from "react-router";
 
 import { DeckNotFound } from "@/components/DeckNotFound";
 import { Markdown } from "@/components/markdown/Markdown";
@@ -19,10 +19,10 @@ import { ErrorState, FormError } from "@/components/states";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/cn";
-import { deckDisplayName } from "@/lib/collections";
+import { collectionApi, deckDisplayName, deckPath } from "@/lib/collections";
 import { formatRelative, plural, studyCountsText } from "@/lib/format";
 import { isNotFound, useDeck } from "@/lib/queries";
-import type { Deck, QuizResult, StudyCard, StudyNext } from "@/lib/types";
+import type { CollectionView, Deck, QuizResult, StudyCard, StudyNext } from "@/lib/types";
 
 type QuizCard = Extract<StudyCard, { type: "quiz" }>;
 type BasicCard = Extract<StudyCard, { type: "basic" }>;
@@ -109,7 +109,8 @@ function RatingButtons({
 
 interface ReviewProps<Card> {
   card: Card;
-  deckId: string;
+  // The API path of a study route: a deck's, or a collection's.
+  endpoint: (route: string) => string;
   rate: (rating: Rating) => void;
   rating: { isPending: boolean; error: unknown };
   advance: (next: StudyNext) => void;
@@ -174,13 +175,13 @@ function BasicReview({ card, rate, rating }: ReviewProps<BasicCard>) {
   );
 }
 
-function QuizReview({ card, deckId, rate, rating, advance }: ReviewProps<QuizCard>) {
+function QuizReview({ card, endpoint, rate, rating, advance }: ReviewProps<QuizCard>) {
   const [selected, setSelected] = useState<string[]>([]);
   const [result, setResult] = useState<QuizResult | null>(null);
   const resultRef = useRef<HTMLDivElement>(null);
   const answer = useMutation({
     mutationFn: () =>
-      api<QuizResult>(`/decks/${deckId}/reviews/quiz-answer`, {
+      api<QuizResult>(endpoint("/reviews/quiz-answer"), {
         method: "POST",
         body: { card_id: card.id, selected_option_ids: selected },
       }),
@@ -345,14 +346,35 @@ function QuizReview({ card, deckId, rate, rating, advance }: ReviewProps<QuizCar
   );
 }
 
-function Finished({ deck, study, reviewed }: { deck: Deck; study: StudyNext; reviewed: number }) {
+// Where a study session draws its cards from: one deck, or every deck in a collection.
+interface StudySource {
+  key: string;
+  title: string;
+  endpoint: (route: string) => string;
+  back: { to: string; label: string };
+  cardCount: number;
+  // Shown when today's new cards are used up.
+  limitDetail: string;
+  // For a collection, the deck a card comes from.
+  deckName?: (deckId: string) => string | undefined;
+}
+
+function Finished({
+  source,
+  study,
+  reviewed,
+}: {
+  source: StudySource;
+  study: StudyNext;
+  reviewed: number;
+}) {
   let detail: string;
   if (study.next_due_at) {
     detail = `The next review is due ${formatRelative(study.next_due_at)}.`;
-  } else if (deck.card_count === 0) {
-    detail = "This deck has no cards yet.";
+  } else if (source.cardCount === 0) {
+    detail = "There are no cards here yet.";
   } else {
-    detail = `You've had today's ${plural(deck.new_cards_per_day, "new card")}. More come after 4:00 tomorrow, or raise the limit in deck settings.`;
+    detail = source.limitDetail;
   }
   return (
     <div className="grid animate-rise-in justify-items-start gap-6">
@@ -373,23 +395,23 @@ function Finished({ deck, study, reviewed }: { deck: Deck; study: StudyNext; rev
         </p>
       </div>
       <Button asChild>
-        <Link to={`/decks/${deck.id}`}>
+        <Link to={source.back.to}>
           <ArrowLeftIcon aria-hidden />
-          Back to deck
+          {source.back.label}
         </Link>
       </Button>
     </div>
   );
 }
 
-function StudySession({ deck }: { deck: Deck }) {
+function StudySession({ source }: { source: StudySource }) {
   const queryClient = useQueryClient();
   const [current, setCurrent] = useState<StudyNext | null>(null);
   const [reviewed, setReviewed] = useState(0);
   const cardRef = useRef<HTMLElement>(null);
   const initial = useQuery({
-    queryKey: ["study", deck.id],
-    queryFn: () => api<StudyNext>(`/decks/${deck.id}/study/next`),
+    queryKey: ["study", source.key],
+    queryFn: () => api<StudyNext>(source.endpoint("/study/next")),
     staleTime: 0,
     gcTime: 0,
   });
@@ -397,10 +419,11 @@ function StudySession({ deck }: { deck: Deck }) {
   // Counts on the deck pages are stale once anything is rated here.
   useEffect(
     () => () => {
-      void queryClient.invalidateQueries({ queryKey: ["decks"] });
-      void queryClient.invalidateQueries({ queryKey: ["deck", deck.id] });
+      for (const queryKey of [["decks"], ["deck"], ["collection"]]) {
+        void queryClient.invalidateQueries({ queryKey });
+      }
     },
-    [queryClient, deck.id],
+    [queryClient],
   );
 
   const advance = (next: StudyNext) => {
@@ -411,7 +434,7 @@ function StudySession({ deck }: { deck: Deck }) {
   };
   const rating = useMutation({
     mutationFn: ({ cardId, value }: { cardId: string; value: Rating }) =>
-      api<StudyNext>(`/decks/${deck.id}/reviews`, {
+      api<StudyNext>(source.endpoint("/reviews"), {
         method: "POST",
         body: { card_id: cardId, rating: value },
       }),
@@ -439,39 +462,44 @@ function StudySession({ deck }: { deck: Deck }) {
     body = <ErrorState error={initial.error} onRetry={() => void initial.refetch()} />;
   } else if (study?.card) {
     const props = {
-      deckId: deck.id,
+      endpoint: source.endpoint,
       rate: (value: Rating) => {
         if (study.card) rating.mutate({ cardId: study.card.id, value });
       },
       rating: { isPending: rating.isPending, error: rating.error },
       advance,
     };
+    const deckName = source.deckName?.(study.card.deck_id);
     // Keyed per review, not per card: a card failed moments ago can come straight back.
     bodyKey = `${study.card.id}-${String(reviewed)}`;
-    body =
-      study.card.type === "basic" ? (
-        <BasicReview card={study.card} {...props} />
-      ) : (
-        <QuizReview card={study.card} {...props} />
-      );
+    body = (
+      <>
+        {deckName && <p className="-mb-4 text-sm text-muted-foreground">{deckName}</p>}
+        {study.card.type === "basic" ? (
+          <BasicReview card={study.card} {...props} />
+        ) : (
+          <QuizReview card={study.card} {...props} />
+        )}
+      </>
+    );
   }
 
   return (
     <>
       <header className="mx-auto flex w-[calc(100%-2rem)] max-w-2xl items-center justify-between gap-4 py-4 sm:w-[calc(100%-3rem)]">
         <Link
-          to={`/decks/${deck.id}`}
+          to={source.back.to}
           className="inline-flex min-w-0 items-center gap-1.5 text-sm text-muted-foreground transition-colors duration-(--duration-fast) hover:text-foreground"
         >
           <ArrowLeftIcon className="size-4 shrink-0" aria-hidden />
-          <span className="truncate">{deckDisplayName(deck.name)}</span>
+          <span className="truncate">{source.title}</span>
         </Link>
         {study?.card && counts}
       </header>
       <main className="flex flex-1 justify-center px-4 pt-[min(8vh,4rem)] pb-16 sm:px-6">
         {study && !study.card ? (
           <div className="w-full max-w-2xl">
-            <Finished deck={deck} study={study} reviewed={reviewed} />
+            <Finished source={source} study={study} reviewed={reviewed} />
           </div>
         ) : (
           <article
@@ -491,9 +519,39 @@ function StudySession({ deck }: { deck: Deck }) {
   );
 }
 
-export function StudyPage() {
-  const { deckId = "" } = useParams();
-  const deck = useDeck(deckId);
+function deckSource(deck: Deck): StudySource {
+  return {
+    key: deck.id,
+    title: deckDisplayName(deck.name),
+    endpoint: (route) => `/decks/${deck.id}${route}`,
+    back: { to: `/decks/${deck.id}`, label: "Back to deck" },
+    cardCount: deck.card_count,
+    limitDetail: `You've had today's ${plural(deck.new_cards_per_day, "new card")}. More come after 4:00 tomorrow, or raise the limit in deck settings.`,
+  };
+}
+
+function collectionSource(collection: CollectionView): StudySource {
+  const depth = deckPath(collection.path).length;
+  const names = new Map(
+    collection.decks.map((deck) => {
+      // Named from inside the collection: "Extras / Quirks" in "Java".
+      const inside = deckPath(deck.name).slice(depth);
+      return [deck.id, inside.length > 0 ? inside.join(" / ") : deckDisplayName(deck.name)];
+    }),
+  );
+  return {
+    key: `collection:${collection.path}`,
+    title: deckDisplayName(collection.path),
+    endpoint: (route) => collectionApi(collection.path, route),
+    back: { to: "/", label: "Back to your decks" },
+    cardCount: collection.decks.reduce((total, deck) => total + deck.card_count, 0),
+    limitDetail:
+      "You've had today's new cards from every deck here. More come after 4:00 tomorrow, or raise the limit in collection settings.",
+    deckName: (deckId) => names.get(deckId),
+  };
+}
+
+function useStudyScene() {
   useEffect(() => {
     const root = document.documentElement;
     root.dataset.scene = "study";
@@ -501,6 +559,12 @@ export function StudyPage() {
       delete root.dataset.scene;
     };
   }, []);
+}
+
+export function StudyPage() {
+  const { deckId = "" } = useParams();
+  const deck = useDeck(deckId);
+  useStudyScene();
   return (
     <div className="flex min-h-dvh flex-col">
       <title>{`Study${deck.data ? ` · ${deckDisplayName(deck.data.name)}` : ""} · Engram`}</title>
@@ -517,7 +581,56 @@ export function StudyPage() {
           )}
         </main>
       ) : (
-        <StudySession deck={deck.data} />
+        <StudySession source={deckSource(deck.data)} />
+      )}
+    </div>
+  );
+}
+
+function CollectionNotFound() {
+  return (
+    <div className="grid justify-items-start gap-4" role="alert">
+      <title>Collection not found · Engram</title>
+      <h1 className="text-2xl font-semibold">Collection not found</h1>
+      <p className="text-muted-foreground">
+        None of your decks are in it. Its decks may have been renamed, deleted or unshared.
+      </p>
+      <Button asChild variant="secondary">
+        <Link to="/">
+          <ArrowLeftIcon aria-hidden />
+          Back to your decks
+        </Link>
+      </Button>
+    </div>
+  );
+}
+
+export function CollectionStudyPage() {
+  const [params] = useSearchParams();
+  const path = params.get("path") ?? "";
+  const collection = useQuery({
+    queryKey: ["collection", path],
+    queryFn: () => api<CollectionView>(collectionApi(path)),
+    enabled: path !== "",
+  });
+  useStudyScene();
+  return (
+    <div className="flex min-h-dvh flex-col">
+      <title>{`Study${path ? ` · ${deckDisplayName(path)}` : ""} · Engram`}</title>
+      {path === "" || collection.isError ? (
+        <main className="mx-auto w-full max-w-2xl px-4 py-12">
+          {path === "" || isNotFound(collection.error) ? (
+            <CollectionNotFound />
+          ) : (
+            <ErrorState error={collection.error} onRetry={() => void collection.refetch()} />
+          )}
+        </main>
+      ) : collection.isPending ? (
+        <p role="status" className="sr-only">
+          Loading
+        </p>
+      ) : (
+        <StudySession source={collectionSource(collection.data)} />
       )}
     </div>
   );

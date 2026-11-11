@@ -12,6 +12,15 @@ export function deckPath(name: string): string[] {
   return path.length > 0 ? path : [name];
 }
 
+// The API path for a collection-wide route: collectionApi("Java", "/study/next").
+export function collectionApi(key: string, route = ""): string {
+  return `/collections${route}?path=${encodeURIComponent(key)}`;
+}
+
+export function collectionStudyUrl(key: string): string {
+  return `/collections/study?path=${encodeURIComponent(key)}`;
+}
+
 // For places that show one deck on its own: "Java / Day 1".
 export function deckDisplayName(name: string): string {
   return deckPath(name).join(" / ");
@@ -36,6 +45,13 @@ export interface Collection {
 }
 
 export type DeckNode = DeckLeaf | Collection;
+
+// Every deck in a collection, its subcollections' included.
+export function collectionDecks(collection: Collection): Deck[] {
+  return collection.children.flatMap((node) =>
+    node.kind === "deck" ? [node.deck] : collectionDecks(node),
+  );
+}
 
 export const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
 

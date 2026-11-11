@@ -19,7 +19,7 @@ Exported files include quiz answer keys. Anyone who receives one can see the ans
 |---|---|---|---|
 | `name` | string | yes | 1 to 200 characters. Leading and trailing spaces are trimmed. |
 
-A `::` in the name puts the deck in a collection, as in Anki: `Spanish::Verbs` is listed as "Verbs" inside "Spanish", and collections can nest. Collections exist only through deck names; renaming a deck moves it, and a collection disappears with its last deck.
+A `::` in the name puts the deck in a collection, as in Anki: `Spanish::Verbs` is listed as "Verbs" inside "Spanish", and collections can nest. Collections exist only through deck names; renaming a deck moves it, and a collection disappears with its last deck. In the web app a collection can be studied, shared, renamed and deleted as a whole; sharing, renaming and deleting cover only the decks you own in it.
 | `description` | string | no | Up to 2,000 characters. Defaults to `""`. |
 
 ## Cards

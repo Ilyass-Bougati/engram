@@ -1,6 +1,12 @@
 import { describe, expect, test } from "vitest";
 
-import { buildDeckTree, deckDisplayName, type DeckNode } from "@/lib/collections";
+import {
+  buildDeckTree,
+  collectionApi,
+  collectionDecks,
+  deckDisplayName,
+  type DeckNode,
+} from "@/lib/collections";
 import type { Deck } from "@/lib/types";
 
 function deck(name: string, due = 0, fresh = 0): Deck {
@@ -64,5 +70,27 @@ describe("buildDeckTree", () => {
     const tree = buildDeckTree([deck("Spanish::Verbs"), deck("Spanish::Verbs"), deck("::Odd::")]);
     expect(outline(tree)).toEqual(["Odd", { Spanish: ["Verbs", "Verbs"], totals: [0, 0, 20, 2] }]);
     expect(deckDisplayName("OCP Java 17::Day 1")).toBe("OCP Java 17 / Day 1");
+  });
+});
+
+describe("collection helpers", () => {
+  test("collect a collection's decks, nested ones included", () => {
+    const [java] = buildDeckTree([
+      deck("Java::Basics"),
+      deck("Java::Extras::Quirks"),
+      deck("Rust"),
+    ]);
+    expect(java?.kind).toBe("collection");
+    if (java?.kind !== "collection") return;
+    expect(collectionDecks(java).map((d) => d.name)).toEqual([
+      "Java::Basics",
+      "Java::Extras::Quirks",
+    ]);
+  });
+
+  test("put the collection's path in the query string, encoded", () => {
+    expect(collectionApi("C++ & Rust::Day 1", "/study/next")).toBe(
+      "/collections/study/next?path=C%2B%2B%20%26%20Rust%3A%3ADay%201",
+    );
   });
 });

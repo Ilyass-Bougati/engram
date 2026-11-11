@@ -3,11 +3,12 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Annotated, Any
 
-from fastapi import Depends, Header, HTTPException, status
+from fastapi import Depends, Header, HTTPException, Query, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlmodel import select
 
 from app.db import SessionDep
+from app.deck_paths import deck_path, in_collection, path_sort_key
 from app.models import DECK_ROLE_RANK, Deck, DeckMember, DeckRole, GlobalRole, User
 from app.security import decode_access_token
 
@@ -100,3 +101,55 @@ DECK_ROLE_DEPENDENCIES = (deck_viewer, deck_editor, deck_owner)
 ViewerAccess = Annotated[DeckAccess, Depends(deck_viewer)]
 EditorAccess = Annotated[DeckAccess, Depends(deck_editor)]
 OwnerAccess = Annotated[DeckAccess, Depends(deck_owner)]
+
+
+@dataclass
+class CollectionAccess:
+    path: list[str]
+    user: User
+    # The collection's decks that the user is a member of, in the deck list's order.
+    decks: list[tuple[Deck, DeckMember]]
+
+    def owned(self, action: str) -> list[Deck]:
+        owned = [deck for deck, member in self.decks if member.role == DeckRole.owner]
+        if not owned:
+            raise HTTPException(
+                status.HTTP_403_FORBIDDEN,
+                f"You don't own any deck in this collection, so you can't {action}. "
+                "Ask the owners of its decks.",
+            )
+        return owned
+
+
+def collection_access(
+    user: CurrentUser,
+    session: SessionDep,
+    path: Annotated[
+        str,
+        Query(
+            min_length=1,
+            max_length=200,
+            description="The collection's path, its parts joined by `::`, as in `Java::Day 1`.",
+        ),
+    ],
+) -> CollectionAccess:
+    collection = deck_path(path)
+    rows = session.exec(
+        select(Deck, DeckMember).join(DeckMember).where(DeckMember.user_id == user.id)
+    ).all()
+    decks = sorted(
+        (row for row in rows if in_collection(row[0].name, collection)),
+        key=lambda row: (path_sort_key(row[0].name), row[0].created_at),
+    )
+    # Only decks the user is a member of count, so a collection of other people's decks
+    # looks exactly like one that doesn't exist.
+    if not decks:
+        raise HTTPException(
+            status.HTTP_404_NOT_FOUND,
+            "Collection not found. Its decks may have been renamed, deleted or unshared.",
+        )
+    return CollectionAccess(path=collection, user=user, decks=list(decks))
+
+
+# Every /collections route depends on this; tests/test_route_auth.py enforces it.
+CollectionDep = Annotated[CollectionAccess, Depends(collection_access)]

@@ -86,6 +86,25 @@ export interface Member {
   role: DeckRole;
 }
 
+// Collections are paths in deck names ("Java::Day 1"); /collections routes take one as ?path=.
+export interface CollectionView {
+  path: string;
+  decks: Deck[];
+}
+
+// Decks a collection-wide change was made to, and decks left alone because you don't own them.
+export interface CollectionChange {
+  changed: number;
+  skipped: number;
+}
+
+export interface CollectionMember {
+  user_id: string;
+  username: string;
+  // How many of the collection's decks they have each role on.
+  roles: Partial<Record<DeckRole, number>>;
+}
+
 // The card body accepted by POST/PUT .../cards and by deck files (docs/deck-format.md).
 export type CardData =
   | { type: "basic"; front: string; back: string; tags: string[] }
@@ -99,9 +118,10 @@ export type CardData =
     };
 
 export type StudyCard =
-  | { id: string; type: "basic"; front: string; back: string }
+  | { id: string; deck_id: string; type: "basic"; front: string; back: string }
   | {
       id: string;
+      deck_id: string;
       type: "quiz";
       question: string;
       select_all: boolean;
