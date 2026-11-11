@@ -83,7 +83,7 @@ The end-to-end run uses its own Compose project, `engram-e2e`, and removes it af
 ### Mobile
 
 - Card text goes through `CardMarkdown` (`mobile/lib/widgets/card_markdown.dart`), with the web's rules: raw HTML dropped, links opened only for http, https and mailto, images from https only.
-- Colors, radii, motion and glass come from `mobile/lib/theme.dart`, which mirrors `tokens.css`; no raw colors in screens. Glass (`Glass` in `widgets/glass.dart`) only on the top bar, menus, sheets and the review card.
+- Colors, radii, motion and glass come from `mobile/lib/theme.dart`, which mirrors `tokens.css`; no raw colors in screens. Glass (`Glass` in `widgets/glass.dart`) only on the top bar, the bottom navigation bar, menus, sheets and the review card.
 - Refresh tokens live only in `TokenStore` (the OS keystore), one per server, and each goes only to the server that issued it. Refreshes stay single-flight.
 - When a route the app uses changes, update `mobile/lib/api/models.dart` along with `frontend/src/lib/types.ts`.
 

@@ -29,7 +29,6 @@ Future<void> main() async {
     scheduler: await _notifications(),
     device: await _deviceLocation(),
   );
-  WidgetsBinding.instance.addObserver(reminders);
   runApp(EngramApp(session: session, preferences: preferences, reminders: reminders));
   await session.start();
 }

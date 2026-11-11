@@ -59,6 +59,42 @@ Uri normalizeServerUrl(String input) {
   return Uri(scheme: uri.scheme, host: uri.host, port: uri.hasPort ? uri.port : null, path: path);
 }
 
+/// What a study session draws cards from: one deck, or every deck in a collection.
+sealed class StudyScope {
+  const StudyScope();
+
+  /// The route under this scope, such as '/study/next'.
+  String path(String route);
+
+  Map<String, String>? get query;
+}
+
+class DeckScope extends StudyScope {
+  const DeckScope(this.deckId);
+
+  final String deckId;
+
+  @override
+  String path(String route) => '/decks/$deckId$route';
+
+  @override
+  Map<String, String>? get query => null;
+}
+
+/// A collection is a path in deck names, passed as ?path=, as in frontend/src/lib/collections.ts.
+class CollectionScope extends StudyScope {
+  const CollectionScope(this.collection);
+
+  /// The path, its parts joined by '::', as in 'Java::Day 1'.
+  final String collection;
+
+  @override
+  String path(String route) => '/collections$route';
+
+  @override
+  Map<String, String> get query => {'path': collection};
+}
+
 /// The Engram API, with the same session rules as frontend/src/lib/api.ts:
 ///
 /// - The access token lives in memory only and goes out as a bearer token.
@@ -83,15 +119,19 @@ class ApiClient {
 
   bool get hasAccessToken => _accessToken != null;
 
-  Uri _url(String path) => server.replace(path: '${server.path}/api$path');
+  Uri _url(String path, [Map<String, String>? query]) => server.replace(
+    path: '${server.path}/api$path',
+    queryParameters: query == null || query.isEmpty ? null : query,
+  );
 
   Future<http.Response> _send(
     String method,
     String path, {
     Object? body,
+    Map<String, String>? query,
     Map<String, String> headers = const {},
   }) async {
-    final request = http.Request(method, _url(path))..headers.addAll(headers);
+    final request = http.Request(method, _url(path, query))..headers.addAll(headers);
     final token = _accessToken;
     if (token != null) request.headers['Authorization'] = 'Bearer $token';
     if (body != null) {
@@ -146,8 +186,13 @@ class ApiClient {
     return session;
   }
 
-  Future<Object?> request(String method, String path, {Object? body}) async {
-    var response = await _send(method, path, body: body);
+  Future<Object?> request(
+    String method,
+    String path, {
+    Object? body,
+    Map<String, String>? query,
+  }) async {
+    var response = await _send(method, path, body: body, query: query);
     if (response.statusCode == 401 && _accessToken != null) {
       // The access token expired (15 minutes): refresh once and retry.
       final session = await refreshSession();
@@ -155,7 +200,7 @@ class ApiClient {
         onSessionEnded?.call();
         throw const ApiError(401, sessionExpiredMessage);
       }
-      response = await _send(method, path, body: body);
+      response = await _send(method, path, body: body, query: query);
     }
     if (response.statusCode >= 400) throw _errorFrom(response);
     return _decode(response);
@@ -260,23 +305,63 @@ class ApiClient {
   Future<Deck> deck(String deckId) async =>
       Deck.fromJson(await request('GET', '/decks/$deckId') as Json);
 
-  Future<StudyNext> studyNext(String deckId) async =>
-      StudyNext.fromJson(await request('GET', '/decks/$deckId/study/next') as Json);
-
-  /// Rates the card just studied (1 Again, 2 Hard, 3 Good, 4 Easy) and returns the next one.
-  Future<StudyNext> rate(String deckId, String cardId, int rating) async => StudyNext.fromJson(
-    await request('POST', '/decks/$deckId/reviews', body: {'card_id': cardId, 'rating': rating})
-        as Json,
+  Future<StudyNext> studyNext(StudyScope scope) async => StudyNext.fromJson(
+    await request('GET', scope.path('/study/next'), query: scope.query) as Json,
   );
 
-  Future<QuizResult> answerQuiz(String deckId, String cardId, List<String> optionIds) async =>
+  /// Rates the card just studied (1 Again, 2 Hard, 3 Good, 4 Easy) and returns the next one.
+  Future<StudyNext> rate(StudyScope scope, String cardId, int rating) async => StudyNext.fromJson(
+    await request(
+      'POST',
+      scope.path('/reviews'),
+      query: scope.query,
+      body: {'card_id': cardId, 'rating': rating},
+    ) as Json,
+  );
+
+  Future<QuizResult> answerQuiz(StudyScope scope, String cardId, List<String> optionIds) async =>
       QuizResult.fromJson(
         await request(
           'POST',
-          '/decks/$deckId/reviews/quiz-answer',
+          scope.path('/reviews/quiz-answer'),
+          query: scope.query,
           body: {'card_id': cardId, 'selected_option_ids': optionIds},
         ) as Json,
       );
+
+  /// Your own new-card limit on one deck; other members keep theirs.
+  Future<Deck> setDeckLimit(String deckId, int newCardsPerDay) async => Deck.fromJson(
+    await request('PUT', '/decks/$deckId/me', body: {'new_cards_per_day': newCardsPerDay}) as Json,
+  );
+
+  /// Your new-card limit on every deck in a collection. It still counts per deck.
+  Future<CollectionView> setCollectionLimit(String path, int newCardsPerDay) async =>
+      CollectionView.fromJson(
+        await request(
+          'PUT',
+          '/collections/me',
+          query: {'path': path},
+          body: {'new_cards_per_day': newCardsPerDay},
+        ) as Json,
+      );
+
+  /// A page of a deck's cards, oldest first. [q] matches any text on a card, [tag] one tag;
+  /// pass the last page's `nextCursor` as [cursor] for the next.
+  Future<CardPage> cards(String deckId, {String q = '', String tag = '', String? cursor}) async =>
+      CardPage.fromJson(
+        await request(
+          'GET',
+          '/decks/$deckId/cards',
+          query: {'q': ?_nonEmpty(q), 'tag': ?_nonEmpty(tag), 'cursor': ?cursor},
+        ) as Json,
+      );
+
+  Future<List<TagCount>> tags(String deckId) async => [
+    for (final tag in await request('GET', '/decks/$deckId/tags') as List<dynamic>)
+      TagCount.fromJson(tag as Json),
+  ];
+
+  static String? _nonEmpty(String value) => value.isEmpty ? null : value;
 
   Future<Stats> stats() async => Stats.fromJson(await request('GET', '/me/stats') as Json);
 

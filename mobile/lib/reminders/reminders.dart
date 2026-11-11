@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:timezone/timezone.dart' as tz;
 
@@ -29,7 +27,7 @@ const defaultReminderTime = TimeOfDay(hour: 19, minute: 0);
 /// Daily study reminders at the times chosen in Settings, skipped once the day's reviews are
 /// done. Everything runs on the phone: "done" means every deck's due and new counts from
 /// GET /api/decks are zero. Reminders follow whoever is signed in on the server in use.
-class Reminders extends ChangeNotifier with WidgetsBindingObserver {
+class Reminders extends ChangeNotifier {
   Reminders({
     required this._preferences,
     required this._scheduler,
@@ -167,9 +165,4 @@ class Reminders extends ChangeNotifier with WidgetsBindingObserver {
       );
     }
   });
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) unawaited(refresh());
-  }
 }

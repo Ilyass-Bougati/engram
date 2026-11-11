@@ -74,16 +74,18 @@ class Deck {
 }
 
 sealed class StudyCard {
-  const StudyCard(this.id);
+  const StudyCard(this.id, this.deckId);
 
   factory StudyCard.fromJson(Json json) => switch (json['type']) {
     'basic' => BasicStudyCard(
       id: json['id'] as String,
+      deckId: json['deck_id'] as String?,
       front: json['front'] as String,
       back: json['back'] as String,
     ),
     'quiz' => QuizStudyCard(
       id: json['id'] as String,
+      deckId: json['deck_id'] as String?,
       question: json['question'] as String,
       selectAll: json['select_all'] as bool,
       options: [
@@ -95,10 +97,18 @@ sealed class StudyCard {
   };
 
   final String id;
+
+  /// The deck the card comes from. Collection study shows its name; older servers omit it.
+  final String? deckId;
 }
 
 class BasicStudyCard extends StudyCard {
-  const BasicStudyCard({required String id, required this.front, required this.back}) : super(id);
+  const BasicStudyCard({
+    required String id,
+    String? deckId,
+    required this.front,
+    required this.back,
+  }) : super(id, deckId);
 
   final String front;
   final String back;
@@ -114,10 +124,11 @@ class StudyOption {
 class QuizStudyCard extends StudyCard {
   const QuizStudyCard({
     required String id,
+    String? deckId,
     required this.question,
     required this.selectAll,
     required this.options,
-  }) : super(id);
+  }) : super(id, deckId);
 
   final String question;
   final bool selectAll;
@@ -275,6 +286,7 @@ class Stats {
   const Stats({
     required this.activity,
     required this.retentionLast30Days,
+    this.retentionByMonth = const [],
     required this.states,
     required this.decks,
   });
@@ -282,12 +294,154 @@ class Stats {
   factory Stats.fromJson(Json json) => Stats(
     activity: Activity.fromJson(json['activity'] as Json),
     retentionLast30Days: Retention.fromJson(json['retention_last_30_days'] as Json),
+    retentionByMonth: [
+      for (final month in json['retention_by_month'] as List<dynamic>? ?? const <dynamic>[])
+        MonthRetention.fromJson(month as Json),
+    ],
     states: CardStates.fromJson(json['states'] as Json),
     decks: [for (final deck in json['decks'] as List<dynamic>) DeckStats.fromJson(deck as Json)],
   );
 
   final Activity activity;
   final Retention retentionLast30Days;
+
+  /// The past 12 months, oldest first.
+  final List<MonthRetention> retentionByMonth;
   final CardStates states;
   final List<DeckStats> decks;
+}
+
+class MonthRetention extends Retention {
+  const MonthRetention({required this.month, required super.reviews, required super.remembered});
+
+  factory MonthRetention.fromJson(Json json) => MonthRetention(
+    month: json['month'] as String,
+    reviews: json['reviews'] as int,
+    remembered: json['remembered'] as int,
+  );
+
+  /// "YYYY-MM".
+  final String month;
+}
+
+/// A collection: a path in deck names ("Java::Day 1"), with the decks in it you're a member of.
+class CollectionView {
+  const CollectionView({required this.path, required this.decks});
+
+  factory CollectionView.fromJson(Json json) => CollectionView(
+    path: json['path'] as String,
+    decks: [for (final deck in json['decks'] as List<dynamic>) Deck.fromJson(deck as Json)],
+  );
+
+  final String path;
+  final List<Deck> decks;
+}
+
+/// A card as the deck page lists it.
+sealed class CardView {
+  const CardView({required this.id, required this.tags});
+
+  factory CardView.fromJson(Json json) {
+    final tags = [for (final tag in json['tags'] as List<dynamic>) tag as String];
+    return switch (json['type']) {
+      'basic' => BasicCardView(
+        id: json['id'] as String,
+        front: json['front'] as String,
+        back: json['back'] as String,
+        tags: tags,
+      ),
+      'quiz' => QuizCardView(
+        id: json['id'] as String,
+        question: json['question'] as String,
+        selectAll: json['select_all'] as bool,
+        options: [
+          for (final option in json['options'] as List<dynamic>)
+            CardOption(
+              id: (option as Json)['id'] as String,
+              text: option['text'] as String,
+              correct: option['correct'] as bool?,
+            ),
+        ],
+        explanation: json['explanation'] as String?,
+        tags: tags,
+      ),
+      final type => throw FormatException('Unknown card type $type'),
+    };
+  }
+
+  final String id;
+  final List<String> tags;
+
+  /// The text the card asks: a basic card's front, a quiz card's question.
+  String get prompt;
+}
+
+class BasicCardView extends CardView {
+  const BasicCardView({
+    required super.id,
+    required this.front,
+    required this.back,
+    required super.tags,
+  });
+
+  final String front;
+  final String back;
+
+  @override
+  String get prompt => front;
+}
+
+class CardOption {
+  const CardOption({required this.id, required this.text, this.correct});
+
+  final String id;
+  final String text;
+
+  /// Only sent to editors and the owner: viewers don't see the answer key.
+  final bool? correct;
+}
+
+class QuizCardView extends CardView {
+  const QuizCardView({
+    required super.id,
+    required this.question,
+    required this.selectAll,
+    required this.options,
+    required this.explanation,
+    required super.tags,
+  });
+
+  final String question;
+  final bool selectAll;
+  final List<CardOption> options;
+
+  /// Only sent to editors and the owner, like the answer key.
+  final String? explanation;
+
+  @override
+  String get prompt => question;
+}
+
+class CardPage {
+  const CardPage({required this.cards, required this.nextCursor});
+
+  factory CardPage.fromJson(Json json) => CardPage(
+    cards: [for (final card in json['cards'] as List<dynamic>) CardView.fromJson(card as Json)],
+    nextCursor: json['next_cursor'] as String?,
+  );
+
+  final List<CardView> cards;
+
+  /// Pass back for the next page; null on the last one.
+  final String? nextCursor;
+}
+
+class TagCount {
+  const TagCount({required this.tag, required this.cardCount});
+
+  factory TagCount.fromJson(Json json) =>
+      TagCount(tag: json['tag'] as String, cardCount: json['card_count'] as int);
+
+  final String tag;
+  final int cardCount;
 }

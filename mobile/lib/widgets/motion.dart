@@ -128,3 +128,38 @@ Widget dialogTransition(
     },
   );
 }
+
+/// Rises in again whenever [value] changes, keeping [child]'s state: the home shell's tabs, which
+/// must not be rebuilt when switching, but should arrive like a page.
+class RiseOnChange extends StatefulWidget {
+  const RiseOnChange({super.key, required this.value, required this.child});
+
+  final Object value;
+  final Widget child;
+
+  @override
+  State<RiseOnChange> createState() => _RiseOnChangeState();
+}
+
+class _RiseOnChangeState extends State<RiseOnChange> with SingleTickerProviderStateMixin {
+  late final _controller = AnimationController(vsync: this, duration: Motion.base, value: 1);
+  late final _curve = CurvedAnimation(parent: _controller, curve: Motion.ease);
+
+  @override
+  void didUpdateWidget(RiseOnChange old) {
+    super.didUpdateWidget(old);
+    if (old.value != widget.value && !MediaQuery.disableAnimationsOf(context)) {
+      _controller.forward(from: 0);
+    }
+  }
+
+  @override
+  void dispose() {
+    _curve.dispose();
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => _Rise(animation: _curve, offset: 6, child: widget.child);
+}

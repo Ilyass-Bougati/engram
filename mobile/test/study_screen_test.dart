@@ -57,9 +57,10 @@ class _Server {
           ? <String, Object?>{}
           : jsonDecode(request.body) as Map<String, Object?>;
       final answer = switch (request.url.path) {
-        '/api/decks/d1/study/next' => first,
-        '/api/decks/d1/reviews' => onRate!(body),
-        '/api/decks/d1/reviews/quiz-answer' => onAnswer!(body),
+        '/api/decks/d1/study/next' || '/api/collections/study/next' => first,
+        '/api/decks/d1/reviews' || '/api/collections/reviews' => onRate!(body),
+        '/api/decks/d1/reviews/quiz-answer' ||
+        '/api/collections/reviews/quiz-answer' => onAnswer!(body),
         _ => throw StateError('unexpected ${request.url}'),
       };
       return http.Response(jsonEncode(answer), 200, headers: {'content-type': 'application/json'});
@@ -71,7 +72,7 @@ Future<void> _open(WidgetTester tester, _Server server) async {
   await tester.pumpWidget(
     MaterialApp(
       theme: buildTheme(Brightness.light),
-      home: StudyScreen(api: server.client(), deck: _deck),
+      home: StudyScreen(api: server.client(), source: StudySource.deck(_deck)),
     ),
   );
   await tester.pump();
@@ -164,5 +165,47 @@ void main() {
     await tester.tap(find.text('Easy'));
     await tester.pumpAndSettle();
     expect(find.text('Done for now'), findsOneWidget);
+  });
+
+  testWidgets('a collection studies across its decks and names the deck over each card', (
+    tester,
+  ) async {
+    const other = Deck(
+      id: 'd2',
+      name: 'Languages::Italian::Verbs',
+      description: '',
+      role: DeckRole.owner,
+      cardCount: 4,
+      dueCount: 1,
+      newCount: 0,
+      newCardsPerDay: 20,
+    );
+    final server = _Server(_next({..._basic, 'deck_id': 'd2'}))
+      ..onRate = (body) => _next({..._basic, 'id': 'c3', 'deck_id': 'd1'});
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildTheme(Brightness.light),
+        home: StudyScreen(
+          api: server.client(),
+          source: StudySource.collection('Languages', const [_deck, other]),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pumpAndSettle();
+
+    expect(find.text('Languages'), findsOneWidget, reason: 'the title is the collection');
+    expect(find.text('Italian / Verbs'), findsOneWidget);
+    final first = server.requests.single;
+    expect(first.url.path, '/api/collections/study/next');
+    expect(first.url.queryParameters, {'path': 'Languages'});
+
+    await tester.tap(find.text('Show answer'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Good'));
+    await tester.pumpAndSettle();
+    expect(server.requests.last.url.path, '/api/collections/reviews');
+    expect(server.requests.last.url.queryParameters, {'path': 'Languages'});
+    expect(find.text('Spanish'), findsOneWidget, reason: 'the next card is from the other deck');
   });
 }

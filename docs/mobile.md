@@ -5,10 +5,13 @@
 | In the app | Web only |
 |---|---|
 | Sign in, and sign up from an invite link | Creating, editing and deleting decks and cards |
-| Your decks, grouped into collections, with today's due and new counts, and the same "Suggested for you" deck as the web | Imports (deck files and Anki) and exports, forks |
-| Studying basic and quiz cards | Sharing and members |
-| Stats: streaks, retention, activity, card states | Deck settings, such as the new-card limit |
-| Settings: theme, study reminders, timezone, password, sign out | Admin: invites and accounts |
+| Home: today's counts, the same "Suggested for you" deck as the web, what's up next, and a stats summary | Renaming, moving and deleting decks and collections |
+| Your decks and collections, with today's due and new counts | Imports (deck files and Anki) and exports, forks |
+| Studying a deck, or a whole collection | Sharing and members |
+| Browsing a deck's cards: search, tag filter, each card read-only | Deck names and descriptions |
+| Your new-card limit, per deck or for every deck in a collection | Admin: invites and accounts |
+| Stats: streaks, activity, retention by month, card states | |
+| Settings: theme, study reminders, timezone, password, server, sign out | |
 
 It talks to the same API as the web app, and the backend needed no changes for it.
 
@@ -56,11 +59,20 @@ Cards go through one renderer, [`card_markdown.dart`](../mobile/lib/widgets/card
 
 ## Design
 
+The app is laid out for a phone. A glass bar along the bottom switches between four tabs:
+
+- **Home**, the first page. It shows the suggestion, or "All done for today", plus today's counts, a stats strip (streak, reviews today, 30-day retention) and up to three more decks waiting.
+- **Decks.** Top-level collections and loose decks. A collection opens its own page, with Study (the whole collection), New cards per day, and its decks and sub-collections. A deck opens its page: Study, its limit, and its cards to search and filter by tag.
+- **Stats.**
+- **Settings.**
+
+Each tab keeps its own pages, so a deck left open in Decks is still there after a look at Stats. Tapping the tab you're on goes back to its first page, and Android's back button closes pages within a tab, then returns to Home. Studying opens full screen, above the tabs. Home, Decks and Stats share one copy of your decks and stats (`lib/library.dart`). It reloads after studying or changing a limit, and when the app comes back to the foreground.
+
 The app uses the web app's design tokens, ported to [`theme.dart`](../mobile/lib/theme.dart): the same colors in light and dark, IBM Plex Sans and Mono (bundled, OFL), the same radii, and the same motion.
 
-- **Glass** goes only on what floats over content, as on the web: the top bar (content scrolls under it), the account menu, sheets, and the review card, which uses the thinner fill over the study backdrop. It is a 24 px blur with 140 % saturation, one edge and a highlight along the top. With the system's high-contrast setting on, glass turns into a solid surface.
+- **Glass** goes only on what floats over content, as on the web: the top bar and the bottom navigation bar (content scrolls under both), sheets, and the review card, which uses the thinner fill over the study backdrop. It is a 24 px blur with 140 % saturation, one edge and a highlight along the top. With the system's high-contrast setting on, glass turns into a solid surface.
 - **The backdrop** is the web's paper gradient with a pine glow from the top left and a warm one from the bottom right. While studying, the pine glow moves behind the card.
-- **The suggestion card** sits above the deck list, as on the web. It picks the same deck (`lib/suggestion.dart` ports `suggestion.ts`), over the same slow swirl of the three `suggestion` greens. The swirl is a fragment shader (`shaders/suggestion_swirl.frag`), the web's GLSL in Flutter's dialect. It holds still with reduced motion, and shows a solid green if the shader can't load.
+- **The suggestion card** leads Home, as it leads the deck list on the web. It picks the same deck (`lib/suggestion.dart` ports `suggestion.ts`), over the same slow swirl of the three `suggestion` greens. The swirl is a fragment shader (`shaders/suggestion_swirl.frag`), the web's GLSL in Flutter's dialect. It holds still with reduced motion, and shows a solid green if the shader can't load.
 - **Motion:** pages, new review cards and revealed answers rise in (fade plus 6 px, 200 ms); going back takes 120 ms. Menus grow from their corner, and sheets come in like the web's dialogs (280 ms). Everything uses the standard deceleration curve. With the system's reduce-motion setting on, nothing moves.
 
 When a token changes in `frontend/src/styles/tokens.css`, change it in `theme.dart` too.

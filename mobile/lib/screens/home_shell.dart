@@ -1,20 +1,38 @@
-import 'package:flutter/material.dart';
+import 'dart:async';
 
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+
+import '../api/models.dart';
 import '../auth/session.dart';
+import '../library.dart';
 import '../preferences.dart';
 import '../reminders/reminders.dart';
 import '../theme.dart';
-import '../widgets/engram_mark.dart';
 import '../widgets/glass.dart';
 import '../widgets/motion.dart';
+import 'app_scope.dart';
 import 'decks_screen.dart';
+import 'home_screen.dart';
 import 'settings_screen.dart';
 import 'stats_screen.dart';
 
-enum _Tab { decks, stats }
+const themeOptions = [
+  (mode: ThemeMode.system, label: 'System', icon: Icons.brightness_auto_outlined),
+  (mode: ThemeMode.light, label: 'Light', icon: Icons.light_mode_outlined),
+  (mode: ThemeMode.dark, label: 'Dark', icon: Icons.dark_mode_outlined),
+];
 
-/// The signed-in app, laid out like the web app's AppShell: a glass top bar with the mark, the
-/// Decks and Stats links and the account menu, over the current page.
+const _tabs = [
+  (label: 'Home', icon: Icons.home_outlined, selected: Icons.home),
+  (label: 'Decks', icon: Icons.layers_outlined, selected: Icons.layers),
+  (label: 'Stats', icon: Icons.bar_chart_outlined, selected: Icons.bar_chart),
+  (label: 'Settings', icon: Icons.settings_outlined, selected: Icons.settings),
+];
+
+/// The signed-in app: four tabs behind a glass bottom bar. Each tab keeps its own stack, so a
+/// deck opened from Decks is still open after a look at Stats; tapping the tab you're on goes
+/// back to its first page. Studying opens above the shell, full screen.
 class HomeShell extends StatefulWidget {
   const HomeShell({
     super.key,
@@ -31,252 +49,129 @@ class HomeShell extends StatefulWidget {
   State<HomeShell> createState() => _HomeShellState();
 }
 
-class _HomeShellState extends State<HomeShell> {
-  _Tab _tab = _Tab.decks;
+class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
+  final _navigators = [for (final _ in _tabs) GlobalKey<NavigatorState>()];
+  late final Library _library;
+  late User _user;
+  int _tab = 0;
 
-  void _openSettings() => Navigator.of(context).push(
-    MaterialPageRoute<void>(
-      builder: (_) => SettingsScreen(
-        session: widget.session,
-        preferences: widget.preferences,
-        reminders: widget.reminders,
-      ),
+  @override
+  void initState() {
+    super.initState();
+    _library = Library(widget.session.api, reminders: widget.reminders);
+    unawaited(_library.refresh());
+    _user = (widget.session.state as SignedIn).user;
+    widget.session.addListener(_followUser);
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    widget.session.removeListener(_followUser);
+    _library.dispose();
+    super.dispose();
+  }
+
+  // A changed timezone or password keeps the shell; the greeting follows the user.
+  void _followUser() {
+    if (widget.session.state case SignedIn(:final user)) setState(() => _user = user);
+  }
+
+  // Counts change with the clock (cards come due, a new study day starts): refresh on return.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) unawaited(_library.refresh());
+  }
+
+  void _select(int tab) {
+    if (tab == _tab) {
+      _navigators[tab].currentState?.popUntil((route) => route.isFirst);
+    } else {
+      setState(() => _tab = tab);
+    }
+  }
+
+  // Back closes pages within the tab first, then goes to Home, then leaves the app.
+  void _back() {
+    final navigator = _navigators[_tab].currentState;
+    if (navigator != null && navigator.canPop()) {
+      navigator.pop();
+    } else if (_tab != 0) {
+      setState(() => _tab = 0);
+    } else {
+      unawaited(SystemNavigator.pop());
+    }
+  }
+
+  Widget _page(int tab) => switch (tab) {
+    0 => HomeScreen(user: _user),
+    1 => const DecksScreen(),
+    2 => const StatsScreen(),
+    _ => SettingsScreen(
+      session: widget.session,
+      preferences: widget.preferences,
+      reminders: widget.reminders,
     ),
-  );
+  };
 
   @override
   Widget build(BuildContext context) {
-    final state = widget.session.state;
-    final username = state is SignedIn ? state.user.username : '';
-    return GlassScaffold(
-      automaticallyImplyLeading: false,
-      title: Row(
-        children: [
-          const EngramMark(),
-          const SizedBox(width: 8),
-          const Text('Engram', style: TextStyle(fontWeight: FontWeight.w600, letterSpacing: -0.2)),
-          const SizedBox(width: 16),
-          _NavLink(
-            icon: Icons.view_agenda_outlined,
-            label: 'Decks',
-            active: _tab == _Tab.decks,
-            onTap: () => setState(() => _tab = _Tab.decks),
-          ),
-          const SizedBox(width: 4),
-          _NavLink(
-            icon: Icons.bar_chart,
-            label: 'Stats',
-            active: _tab == _Tab.stats,
-            onTap: () => setState(() => _tab = _Tab.stats),
-          ),
-        ],
-      ),
-      actions: [
-        _AccountButton(
-          username: username,
-          preferences: widget.preferences,
-          onSettings: _openSettings,
-          onSignOut: widget.session.signOut,
-        ),
-        const SizedBox(width: 8),
-      ],
-      // Each page rises in when you switch; changes within a page don't replay it.
-      body: RiseIn(
-        key: ValueKey(_tab),
-        child: switch (_tab) {
-          _Tab.decks => DecksScreen(api: widget.session.api, reminders: widget.reminders),
-          _Tab.stats => StatsScreen(api: widget.session.api),
+    final c = context.colors;
+    return AppScope(
+      api: widget.session.api,
+      library: _library,
+      goToTab: _select,
+      rootNavigator: () => Navigator.of(context, rootNavigator: true),
+      child: PopScope(
+        canPop: false,
+        onPopInvokedWithResult: (didPop, _) {
+          if (!didPop) _back();
         },
-      ),
-    );
-  }
-}
-
-class _NavLink extends StatelessWidget {
-  const _NavLink({
-    required this.icon,
-    required this.label,
-    required this.active,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final String label;
-  final bool active;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final c = context.colors;
-    final color = active ? c.ink : c.inkMuted;
-    // Narrow screens show the icon only; the label stays for screen readers, as on the web.
-    final narrow = MediaQuery.sizeOf(context).width < 640;
-    return Semantics(
-      button: true,
-      selected: active,
-      label: label,
-      excludeSemantics: true,
-      child: Material(
-        type: MaterialType.transparency,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: const BorderRadius.all(Radius.circular(Radii.sm)),
-          child: AnimatedContainer(
-            duration: Motion.of(context, Motion.fast),
-            curve: Motion.ease,
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            decoration: BoxDecoration(
-              color: active ? c.pineSoft : c.pineSoft.withValues(alpha: 0),
-              borderRadius: const BorderRadius.all(Radius.circular(Radii.sm)),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
+        child: Scaffold(
+          extendBody: true,
+          backgroundColor: Colors.transparent,
+          body: RiseOnChange(
+            value: _tab,
+            child: IndexedStack(
+              index: _tab,
               children: [
-                Icon(icon, size: 16, color: color),
-                if (!narrow) ...[
-                  const SizedBox(width: 6),
-                  Text(
-                    label,
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: color),
+                for (final (tab, _) in _tabs.indexed)
+                  // Only the tab on show takes part in focus, semantics and tickers.
+                  TickerMode(
+                    enabled: tab == _tab,
+                    child: ExcludeFocus(
+                      excluding: tab != _tab,
+                      child: Navigator(
+                        key: _navigators[tab],
+                        onGenerateRoute: (settings) =>
+                            MaterialPageRoute<void>(settings: settings, builder: (_) => _page(tab)),
+                      ),
+                    ),
                   ),
-                ],
+              ],
+            ),
+          ),
+          bottomNavigationBar: Glass(
+            edges: const {AxisDirection.up},
+            child: NavigationBar(
+              backgroundColor: Colors.transparent,
+              selectedIndex: _tab,
+              onDestinationSelected: _select,
+              indicatorColor: c.pineSoft,
+              labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+              animationDuration: Motion.of(context, Motion.base),
+              destinations: [
+                for (final tab in _tabs)
+                  NavigationDestination(
+                    icon: Icon(tab.icon),
+                    selectedIcon: Icon(tab.selected, color: c.pine),
+                    label: tab.label,
+                  ),
               ],
             ),
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _AccountButton extends StatelessWidget {
-  const _AccountButton({
-    required this.username,
-    required this.preferences,
-    required this.onSettings,
-    required this.onSignOut,
-  });
-
-  final String username;
-  final Preferences preferences;
-  final VoidCallback onSettings;
-  final Future<void> Function() onSignOut;
-
-  @override
-  Widget build(BuildContext context) {
-    final c = context.colors;
-    return Builder(
-      builder: (anchor) => Semantics(
-        button: true,
-        label: 'Account menu, $username',
-        excludeSemantics: true,
-        child: InkWell(
-          borderRadius: const BorderRadius.all(Radius.circular(Radii.sm)),
-          onTap: () => showGlassMenu<void>(
-            context: context,
-            anchor: anchor,
-            builder: (menu) => _AccountMenu(
-              preferences: preferences,
-              onSettings: () {
-                Navigator.of(menu).pop();
-                onSettings();
-              },
-              onSignOut: () {
-                Navigator.of(menu).pop();
-                onSignOut();
-              },
-            ),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.account_circle_outlined, size: 18, color: c.inkMuted),
-                const SizedBox(width: 6),
-                ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 96),
-                  child: Text(
-                    username,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: c.ink),
-                  ),
-                ),
-                Icon(Icons.expand_more, size: 18, color: c.inkMuted),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-const themeOptions = [
-  (mode: ThemeMode.system, label: 'System', icon: Icons.brightness_auto_outlined),
-  (mode: ThemeMode.light, label: 'Light', icon: Icons.light_mode_outlined),
-  (mode: ThemeMode.dark, label: 'Dark', icon: Icons.dark_mode_outlined),
-];
-
-class _AccountMenu extends StatelessWidget {
-  const _AccountMenu({
-    required this.preferences,
-    required this.onSettings,
-    required this.onSignOut,
-  });
-
-  final Preferences preferences;
-  final VoidCallback onSettings;
-  final VoidCallback onSignOut;
-
-  @override
-  Widget build(BuildContext context) {
-    final c = context.colors;
-    Widget item(IconData icon, String label, VoidCallback onTap, {bool checked = false}) => InkWell(
-      onTap: onTap,
-      borderRadius: const BorderRadius.all(Radius.circular(Radii.sm)),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-        child: Row(
-          children: [
-            Icon(icon, size: 18, color: c.inkMuted),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(label, style: TextStyle(fontSize: 14, color: c.ink)),
-            ),
-            if (checked) Icon(Icons.check, size: 16, color: c.pine),
-          ],
-        ),
-      ),
-    );
-    return ListenableBuilder(
-      listenable: preferences,
-      builder: (context, _) => Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(10, 8, 10, 4),
-            child: Text(
-              'Theme',
-              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: c.inkMuted),
-            ),
-          ),
-          for (final option in themeOptions)
-            Semantics(
-              inMutuallyExclusiveGroup: true,
-              checked: preferences.themeMode == option.mode,
-              child: item(
-                option.icon,
-                option.label,
-                () => preferences.setThemeMode(option.mode),
-                checked: preferences.themeMode == option.mode,
-              ),
-            ),
-          const Padding(padding: EdgeInsets.symmetric(vertical: 4), child: Divider()),
-          item(Icons.settings_outlined, 'Settings', onSettings),
-          item(Icons.logout, 'Sign out', onSignOut),
-        ],
       ),
     );
   }

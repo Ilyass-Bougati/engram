@@ -6,16 +6,16 @@ import 'format.dart';
 // if they're left, then new cards. One deck, not a collection, because studying happens one deck
 // at a time.
 
-Deck? suggestDeck(List<Deck> decks) {
-  final ready = decks.where((deck) => deck.dueCount + deck.newCount > 0).toList()
-    ..sort((a, b) {
+Deck? suggestDeck(List<Deck> decks) => rankedDecks(decks).firstOrNull;
+
+/// Every deck with something to study, in the order [suggestDeck] picks from.
+List<Deck> rankedDecks(List<Deck> decks) =>
+    decks.where((deck) => deck.dueCount + deck.newCount > 0).toList()..sort((a, b) {
       final due = b.dueCount.compareTo(a.dueCount);
       if (due != 0) return due;
       final fresh = b.newCount.compareTo(a.newCount);
       return fresh != 0 ? fresh : compareNatural(a.name, b.name);
     });
-  return ready.firstOrNull;
-}
 
 String suggestionReason(Deck deck) {
   final due = deck.dueCount;

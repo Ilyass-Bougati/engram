@@ -77,4 +77,26 @@ void main() {
     ]);
     expect(deckDisplayName('OCP Java 17::Day 1'), 'OCP Java 17 / Day 1');
   });
+
+  test('finds the decks in a collection, at any depth, by whole path parts', () {
+    final decks = [
+      _deck('Java'),
+      _deck('Java::Day 1'),
+      _deck('Java::Extras::Quirks'),
+      _deck('JavaScript::Basics'),
+      _deck('Spanish'),
+    ];
+    expect(collectionDecks(decks, 'Java').map((d) => d.name), [
+      'Java',
+      'Java::Day 1',
+      'Java::Extras::Quirks',
+    ]);
+    expect(collectionDecks(decks, 'Java::Extras').map((d) => d.name), ['Java::Extras::Quirks']);
+  });
+
+  test('names decks from inside their collection', () {
+    expect(nameInCollection('Java::Extras::Quirks', 'Java'), 'Extras / Quirks');
+    expect(nameInCollection('Java', 'Java'), 'Java');
+    expect(firstLine('\n```dart\n# Heading\nmore'), 'Heading');
+  });
 }

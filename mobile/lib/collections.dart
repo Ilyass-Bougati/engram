@@ -112,3 +112,37 @@ List<DeckNode> buildDeckTree(List<Deck> decks) {
   sort(root.children, '');
   return root.children;
 }
+
+/// The decks in the collection [key] ("Java", "Java::Extras"), at any depth. A deck named like
+/// the collection itself belongs to it too, as on the server (in_collection).
+List<Deck> collectionDecks(List<Deck> decks, String key) {
+  final collection = deckPath(key);
+  bool inside(Deck deck) {
+    final path = deckPath(deck.name);
+    if (path.length < collection.length) return false;
+    for (var i = 0; i < collection.length; i++) {
+      if (path[i] != collection[i]) return false;
+    }
+    return true;
+  }
+
+  return decks.where(inside).toList();
+}
+
+/// A deck's name as seen from inside the collection [key]: "Extras / Quirks" in "Java". A deck
+/// named like the collection keeps its full name.
+String nameInCollection(String deckName, String key) {
+  final inside = deckPath(deckName).skip(deckPath(key).length).toList();
+  return inside.isEmpty ? deckDisplayName(deckName) : inside.join(' / ');
+}
+
+/// The first line of a card's Markdown, for one-line previews in lists, as format.ts does.
+String firstLine(String markdown) {
+  final line = markdown
+      .split('\n')
+      .firstWhere(
+        (text) => text.trim().isNotEmpty && !text.trim().startsWith('```'),
+        orElse: () => '',
+      );
+  return line.replaceFirst(RegExp(r'^#{1,6}\s+'), '').trim();
+}

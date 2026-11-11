@@ -220,5 +220,54 @@ void main() {
       expect(await api.refreshSession(), isNull);
       expect(requests, isEmpty);
     });
+
+    test('collection routes pass the path as a query parameter', () async {
+      final api = client((request) async => _json({'card': null, 'due_count': 0, 'new_count': 0}));
+      await api.studyNext(const CollectionScope('Java::Day 1'));
+      expect(requests.last.url.path, '/api/collections/study/next');
+      expect(requests.last.url.query, 'path=Java%3A%3ADay+1');
+      expect(requests.last.url.queryParameters, {'path': 'Java::Day 1'});
+
+      await api.studyNext(const DeckScope('d1'));
+      expect(requests.last.url.toString(), 'https://engram.test/api/decks/d1/study/next');
+    });
+
+    test('new-card limits go to the deck or the collection', () async {
+      final api = client(
+        (request) async => request.url.path.startsWith('/api/collections')
+            ? _json({'path': 'Java', 'decks': <Object>[]})
+            : _json({
+                'id': 'd1',
+                'name': 'Java',
+                'description': '',
+                'role': 'owner',
+                'card_count': 1,
+                'due_count': 0,
+                'new_count': 0,
+                'new_cards_per_day': 30,
+              }),
+      );
+      await api.setDeckLimit('d1', 30);
+      expect(requests.last.method, 'PUT');
+      expect(requests.last.url.path, '/api/decks/d1/me');
+      expect(jsonDecode(requests.last.body), {'new_cards_per_day': 30});
+
+      await api.setCollectionLimit('Java', 12);
+      expect(requests.last.url.path, '/api/collections/me');
+      expect(requests.last.url.queryParameters, {'path': 'Java'});
+      expect(jsonDecode(requests.last.body), {'new_cards_per_day': 12});
+    });
+
+    test('card pages pass only the filters in use', () async {
+      final api = client((request) async => _json({'cards': <Object>[], 'next_cursor': null}));
+      await api.cards('d1');
+      expect(requests.last.url.query, isEmpty);
+      await api.cards('d1', q: 'verb', tag: 'grammar', cursor: '2026-01-01_c9');
+      expect(requests.last.url.queryParameters, {
+        'q': 'verb',
+        'tag': 'grammar',
+        'cursor': '2026-01-01_c9',
+      });
+    });
   });
 }

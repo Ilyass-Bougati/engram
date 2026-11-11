@@ -12,15 +12,56 @@ import '../widgets/states.dart';
 
 const _ratingLabels = {1: 'Again', 2: 'Hard', 3: 'Good', 4: 'Easy'};
 
-/// Studying one deck: the web app's Study page. Basic cards show the front, then the answer and
-/// four ratings. Quiz cards are graded by the server; a wrong answer is already rated Again.
+/// What a session studies, as in the web's Study.tsx: one deck, or every deck in a collection.
+class StudySource {
+  const StudySource({
+    required this.title,
+    required this.scope,
+    required this.cardCount,
+    required this.limitDetail,
+    this.deckNames = const {},
+  });
+
+  factory StudySource.deck(Deck deck) => StudySource(
+    title: deckDisplayName(deck.name),
+    scope: DeckScope(deck.id),
+    cardCount: deck.cardCount,
+    limitDetail:
+        "You've had today's ${plural(deck.newCardsPerDay, 'new card')}. More come after 4:00 "
+        "tomorrow, or raise the limit in the deck's New cards per day.",
+  );
+
+  /// [decks] are the collection's decks, from the deck list the app already has.
+  factory StudySource.collection(String key, List<Deck> decks) => StudySource(
+    title: deckDisplayName(key),
+    scope: CollectionScope(key),
+    cardCount: decks.fold(0, (total, deck) => total + deck.cardCount),
+    limitDetail:
+        "You've had today's new cards from every deck here. More come after 4:00 tomorrow, or "
+        "raise the limit in the collection's New cards per day.",
+    deckNames: {for (final deck in decks) deck.id: nameInCollection(deck.name, key)},
+  );
+
+  final String title;
+  final StudyScope scope;
+  final int cardCount;
+
+  /// Why there's nothing more today when the new-card limit is reached.
+  final String limitDetail;
+
+  /// Deck names by ID, to show above each card in a collection. Empty for one deck.
+  final Map<String, String> deckNames;
+}
+
+/// Studying: the web app's Study page. Basic cards show the front, then the answer and four
+/// ratings. Quiz cards are graded by the server; a wrong answer is already rated Again.
 class StudyScreen extends StatefulWidget {
-  const StudyScreen({super.key, required this.api, required this.deck, this.onFinished});
+  const StudyScreen({super.key, required this.api, required this.source, this.onFinished});
 
   final ApiClient api;
-  final Deck deck;
+  final StudySource source;
 
-  /// Called when there's nothing left to study in this deck, with when cards come back.
+  /// Called when there's nothing left to study here, with when cards come back.
   final ValueChanged<StudyNext>? onFinished;
 
   @override
@@ -31,7 +72,7 @@ class _StudyScreenState extends State<StudyScreen> {
   late Future<StudyNext> _initial = _first();
 
   Future<StudyNext> _first() async {
-    final study = await widget.api.studyNext(widget.deck.id);
+    final study = await widget.api.studyNext(widget.source.scope);
     if (study.card == null) widget.onFinished?.call(study);
     return study;
   }
@@ -57,7 +98,7 @@ class _StudyScreenState extends State<StudyScreen> {
       _ratingError = null;
     });
     try {
-      _advance(await widget.api.rate(widget.deck.id, cardId, rating));
+      _advance(await widget.api.rate(widget.source.scope, cardId, rating));
     } on Object catch (error) {
       if (mounted) setState(() => _ratingError = error);
     } finally {
@@ -73,7 +114,7 @@ class _StudyScreenState extends State<StudyScreen> {
         final study = _current ?? snapshot.data;
         return GlassScaffold(
           scene: Scene.study,
-          title: Text(deckDisplayName(widget.deck.name), overflow: TextOverflow.ellipsis),
+          title: Text(widget.source.title, overflow: TextOverflow.ellipsis),
           actions: [
             if (study?.card != null)
               Padding(
@@ -110,7 +151,7 @@ class _StudyScreenState extends State<StudyScreen> {
     if (card == null) {
       return SafeArea(
         child: RiseIn(
-          child: _Finished(deck: widget.deck, study: study, reviewed: _reviewed),
+          child: _Finished(source: widget.source, study: study, reviewed: _reviewed),
         ),
       );
     }
@@ -119,7 +160,7 @@ class _StudyScreenState extends State<StudyScreen> {
     // A Builder, so the padding is read below the scaffold, where it includes the top bar.
     return Builder(
       builder: (context) => SingleChildScrollView(
-        padding: underTopBar(context, const EdgeInsets.fromLTRB(16, 32, 16, 48)),
+        padding: underBars(context, const EdgeInsets.fromLTRB(16, 32, 16, 48)),
         child: Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 672),
@@ -138,23 +179,26 @@ class _StudyScreenState extends State<StudyScreen> {
                     alignment: Alignment.topCenter,
                     child: RiseIn(
                       key: key,
-                      child: switch (card) {
-                        BasicStudyCard() => _BasicReview(
-                          card: card,
-                          rating: _rating,
-                          error: _ratingError,
-                          onRate: (value) => _rate(card.id, value),
-                        ),
-                        QuizStudyCard() => _QuizReview(
-                          api: widget.api,
-                          deckId: widget.deck.id,
-                          card: card,
-                          rating: _rating,
-                          ratingError: _ratingError,
-                          onRate: (value) => _rate(card.id, value),
-                          onNext: _advance,
-                        ),
-                      },
+                      child: _FromDeck(
+                        name: widget.source.deckNames[card.deckId],
+                        child: switch (card) {
+                          BasicStudyCard() => _BasicReview(
+                            card: card,
+                            rating: _rating,
+                            error: _ratingError,
+                            onRate: (value) => _rate(card.id, value),
+                          ),
+                          QuizStudyCard() => _QuizReview(
+                            api: widget.api,
+                            scope: widget.source.scope,
+                            card: card,
+                            rating: _rating,
+                            ratingError: _ratingError,
+                            onRate: (value) => _rate(card.id, value),
+                            onNext: _advance,
+                          ),
+                        },
+                      ),
                     ),
                   ),
                 ),
@@ -297,7 +341,7 @@ class _BasicReviewState extends State<_BasicReview> {
 class _QuizReview extends StatefulWidget {
   const _QuizReview({
     required this.api,
-    required this.deckId,
+    required this.scope,
     required this.card,
     required this.rating,
     required this.ratingError,
@@ -306,7 +350,7 @@ class _QuizReview extends StatefulWidget {
   });
 
   final ApiClient api;
-  final String deckId;
+  final StudyScope scope;
   final QuizStudyCard card;
   final bool rating;
   final Object? ratingError;
@@ -340,7 +384,7 @@ class _QuizReviewState extends State<_QuizReview> {
       _error = null;
     });
     try {
-      final result = await widget.api.answerQuiz(widget.deckId, widget.card.id, List.of(_selected));
+      final result = await widget.api.answerQuiz(widget.scope, widget.card.id, List.of(_selected));
       if (mounted) setState(() => _result = result);
     } on Object catch (error) {
       if (mounted) setState(() => _error = error);
@@ -561,10 +605,32 @@ class _Badge extends StatelessWidget {
   );
 }
 
-class _Finished extends StatelessWidget {
-  const _Finished({required this.deck, required this.study, required this.reviewed});
+/// In a collection, the deck a card comes from, in small text above it, as on the web.
+class _FromDeck extends StatelessWidget {
+  const _FromDeck({required this.name, required this.child});
 
-  final Deck deck;
+  final String? name;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final name = this.name;
+    if (name == null) return child;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(name, style: TextStyle(fontSize: 14, color: context.colors.inkMuted)),
+        const SizedBox(height: 12),
+        child,
+      ],
+    );
+  }
+}
+
+class _Finished extends StatelessWidget {
+  const _Finished({required this.source, required this.study, required this.reviewed});
+
+  final StudySource source;
   final StudyNext study;
   final int reviewed;
 
@@ -573,12 +639,10 @@ class _Finished extends StatelessWidget {
     final String detail;
     if (study.nextDueAt != null) {
       detail = 'The next review is due ${formatRelative(study.nextDueAt!)}.';
-    } else if (deck.cardCount == 0) {
-      detail = 'This deck has no cards yet.';
+    } else if (source.cardCount == 0) {
+      detail = 'There are no cards here yet.';
     } else {
-      detail =
-          "You've had today's ${plural(deck.newCardsPerDay, 'new card')}. More come after 4:00 "
-          'tomorrow, or raise the limit in the deck settings on the web.';
+      detail = source.limitDetail;
     }
     return MessageState(
       icon: reviewed > 0 ? Icons.task_alt : Icons.event_available_outlined,
@@ -587,7 +651,7 @@ class _Finished extends StatelessWidget {
       action: FilledButton.icon(
         onPressed: () => Navigator.of(context).pop(),
         icon: const Icon(Icons.arrow_back),
-        label: const Text('Back to decks'),
+        label: const Text('Back'),
       ),
     );
   }

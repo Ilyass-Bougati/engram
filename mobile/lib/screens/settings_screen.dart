@@ -33,7 +33,7 @@ class SettingsScreen extends StatelessWidget {
       // A Builder, so the padding is read below the scaffold, where it includes the top bar.
       body: Builder(
         builder: (context) => ListView(
-          padding: underTopBar(context, const EdgeInsets.fromLTRB(16, 24, 16, 48)),
+          padding: underBars(context, const EdgeInsets.fromLTRB(16, 24, 16, 48)),
           children: [
             _Section(
               icon: Icons.contrast,

@@ -210,10 +210,13 @@ class GlassScaffold extends StatelessWidget {
   }
 }
 
-/// Padding that keeps content clear of the glass top bar it scrolls under. Inside a
-/// [GlassScaffold] the top padding already includes the bar.
-EdgeInsets underTopBar(BuildContext context, EdgeInsets padding) =>
-    padding + EdgeInsets.only(top: MediaQuery.paddingOf(context).top);
+/// Padding that keeps content clear of the glass bars it scrolls under: the top bar, and the
+/// bottom navigation bar on the home shell's tabs. Inside a [GlassScaffold] the padding from
+/// [MediaQuery] already includes both.
+EdgeInsets underBars(BuildContext context, EdgeInsets padding) {
+  final insets = MediaQuery.paddingOf(context);
+  return padding + EdgeInsets.only(top: insets.top, bottom: insets.bottom);
+}
 
 /// A glass menu anchored under [anchor], growing from its top-right corner, like the web's
 /// dropdown menus.

@@ -3,106 +3,98 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart' show DateFormat, NumberFormat;
 
-import '../api/client.dart';
 import '../api/models.dart';
 import '../collections.dart';
 import '../format.dart';
 import '../theme.dart';
 import '../widgets/glass.dart';
 import '../widgets/states.dart';
+import 'app_scope.dart';
+import 'stats/retention_chart.dart';
 
-/// Your study statistics: the web app's Stats page, sized for a phone. The body of the Stats
-/// tab in the home shell.
-class StatsScreen extends StatefulWidget {
-  const StatsScreen({super.key, required this.api});
-
-  final ApiClient api;
-
-  @override
-  State<StatsScreen> createState() => _StatsScreenState();
-}
-
-class _StatsScreenState extends State<StatsScreen> {
-  late Future<Stats> _stats = widget.api.stats();
-
-  Future<void> _reload() {
-    final next = widget.api.stats();
-    setState(() => _stats = next);
-    return next.then((_) {}, onError: (_) {});
-  }
+/// The Stats tab: the web app's Stats page, sized for a phone. It reads the stats Home also
+/// shows, from the shared library.
+class StatsScreen extends StatelessWidget {
+  const StatsScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder(
-      future: _stats,
-      builder: (context, snapshot) {
-        if (snapshot.hasError) {
-          return SafeArea(
-            child: ErrorState(error: snapshot.error!, onRetry: _reload),
-          );
-        }
-        final stats = snapshot.data;
-        if (stats == null) return const LoadingState(label: 'Loading your stats');
-        if (stats.activity.totalReviews == 0 && stats.decks.isEmpty) {
-          return const SafeArea(
-            child: MessageState(
-              icon: Icons.bar_chart,
-              title: 'Nothing to show yet',
-              message: 'Create or import a deck and study it; your activity shows up here.',
+    final library = AppScope.of(context).library;
+    return GlassScaffold(
+      automaticallyImplyLeading: false,
+      title: const Text('Stats'),
+      body: ListenableBuilder(
+        listenable: library,
+        builder: (context, _) {
+          final stats = library.stats;
+          if (stats == null && library.statsError != null) {
+            return SafeArea(
+              child: ErrorState(error: library.statsError!, onRetry: library.loadStats),
+            );
+          }
+          if (stats == null) return const LoadingState(label: 'Loading your stats');
+          if (stats.activity.totalReviews == 0 && stats.decks.isEmpty) {
+            return const SafeArea(
+              child: MessageState(
+                icon: Icons.bar_chart,
+                title: 'Nothing to show yet',
+                message: 'Create or import a deck and study it; your activity shows up here.',
+              ),
+            );
+          }
+          return RefreshIndicator(
+            onRefresh: library.loadStats,
+            edgeOffset: underBars(context, EdgeInsets.zero).top,
+            child: ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: underBars(context, const EdgeInsets.fromLTRB(16, 16, 16, 32)),
+              children: [
+                _Tiles(stats: stats),
+                const SizedBox(height: 32),
+                _Section(
+                  title: 'Activity',
+                  description: 'Reviews per day over the past year.',
+                  child: stats.activity.totalReviews == 0
+                      ? Text(
+                          'No reviews yet. Study a deck to fill this in.',
+                          style: TextStyle(color: context.colors.inkMuted),
+                        )
+                      : _ActivityHeatmap(activity: stats.activity),
+                ),
+                if (stats.retentionByMonth.isNotEmpty) ...[
+                  const SizedBox(height: 32),
+                  _Section(
+                    title: 'Retention',
+                    description:
+                        'Of the cards you reviewed on a later day than you last saw them, the '
+                        "share you didn't rate Again. Learning steps on the same day don't count.",
+                    child: RetentionChart(months: stats.retentionByMonth),
+                  ),
+                ],
+                const SizedBox(height: 32),
+                _Section(
+                  title: 'Cards',
+                  description:
+                      'Where your cards stand, across the decks you can study. Young and mature '
+                      'split at a 21-day interval.',
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      _CardStatesBar(states: stats.states),
+                      const SizedBox(height: 16),
+                      _CardStatesLegend(states: stats.states),
+                      if (stats.decks.isNotEmpty) ...[
+                        const SizedBox(height: 24),
+                        _DeckTable(decks: stats.decks),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
             ),
           );
-        }
-        return RefreshIndicator(
-          onRefresh: _reload,
-          edgeOffset: underTopBar(context, EdgeInsets.zero).top,
-          child: ListView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            padding: underTopBar(context, const EdgeInsets.fromLTRB(16, 24, 16, 32)),
-            children: [
-              Semantics(
-                header: true,
-                child: Text(
-                  'Stats',
-                  style: Theme.of(context).textTheme.headlineMedium
-                      ?.copyWith(fontWeight: FontWeight.w600),
-                ),
-              ),
-              const SizedBox(height: 16),
-              _Tiles(stats: stats),
-              const SizedBox(height: 32),
-              _Section(
-                title: 'Activity',
-                description: 'Reviews per day over the past year.',
-                child: stats.activity.totalReviews == 0
-                    ? Text(
-                        'No reviews yet. Study a deck to fill this in.',
-                        style: TextStyle(color: context.colors.inkMuted),
-                      )
-                    : _ActivityHeatmap(activity: stats.activity),
-              ),
-              const SizedBox(height: 32),
-              _Section(
-                title: 'Cards',
-                description:
-                    'Where your cards stand, across the decks you can study. Young and mature '
-                    'split at a 21-day interval.',
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    _CardStatesBar(states: stats.states),
-                    const SizedBox(height: 16),
-                    _CardStatesLegend(states: stats.states),
-                    if (stats.decks.isNotEmpty) ...[
-                      const SizedBox(height: 24),
-                      _DeckTable(decks: stats.decks),
-                    ],
-                  ],
-                ),
-              ),
-            ],
-          ),
-        );
-      },
+        },
+      ),
     );
   }
 }
@@ -401,13 +393,16 @@ class _CardStatesLegend extends StatelessWidget {
       runSpacing: 12,
       children: [
         for (final (index, state) in _states.indexed)
-          SizedBox(
-            width: 120,
+          // A minimum, not a fixed width: labels grow with the phone's text size.
+          ConstrainedBox(
+            constraints: const BoxConstraints(minWidth: 120),
             child: MergeSemantics(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
                       Container(
                         width: 10,
