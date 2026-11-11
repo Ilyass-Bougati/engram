@@ -5,7 +5,7 @@ name: engram
 
 x-backend: &backend
   build: .
-  image: ghcr.io/l03x/engram:0.3.0
+  image: ghcr.io/l03x/engram:0.4.0
   environment:
     DATABASE_URL: postgresql://engram:${POSTGRES_PASSWORD}@db:5432/engram
     JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env (see .env.example)}

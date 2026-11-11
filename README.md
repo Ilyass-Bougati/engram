@@ -65,15 +65,15 @@ In steady state Engram requests 416Mi and is capped at 896Mi.
 The usual way is to let GitHub do it. Set `version` in `backend/pyproject.toml`, commit, then push a matching tag:
 
 ```bash
-git tag v0.3.0
-git push origin v0.3.0
+git tag v0.4.0
+git push origin v0.4.0
 ```
 
 The [release workflow](.github/workflows/release.yml) then:
 
 1. Runs the backend and frontend checks.
 2. Builds the image for amd64 and arm64. The web app is built inside it, once, since its files are the same for both.
-3. Pushes it as `ghcr.io/l03x/engram:0.3.0`.
+3. Pushes it as `ghcr.io/l03x/engram:0.4.0`.
 
 It fails if the tag and the pyproject version disagree. It doesn't touch the cluster.
 
@@ -81,14 +81,14 @@ To build by hand instead, run this from the repository root on any machine with 
 
 ```bash
 docker login ghcr.io -u l03x
-docker build -t ghcr.io/l03x/engram:0.3.0 .
-docker push ghcr.io/l03x/engram:0.3.0
+docker build -t ghcr.io/l03x/engram:0.4.0 .
+docker push ghcr.io/l03x/engram:0.4.0
 ```
 
 If the server's CPU architecture differs from the build machine (an arm64 server, say), build for it instead:
 
 ```bash
-docker buildx build --platform linux/arm64 -t ghcr.io/l03x/engram:0.3.0 --push .
+docker buildx build --platform linux/arm64 -t ghcr.io/l03x/engram:0.4.0 --push .
 ```
 
 The cluster runs `latest`, set in `deploy/k8s/kustomization.yaml` under `images`.

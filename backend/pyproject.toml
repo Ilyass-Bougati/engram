@@ -1,6 +1,6 @@
 [project]
 name = "engram-backend"
-version = "0.3.0"
+version = "0.4.0"
 requires-python = ">=3.12,<3.13"
 dependencies = [
     "alembic>=1.20.1",
